@@ -1,0 +1,109 @@
+#!/bin/bash
+
+#This script is designed to grab every Jamf Log you can think of when you're troubleshooting.
+#Jamf Connect files are labeled as you would find them by using the menu bar> about> collect logs
+#All other files are labeled as you would find them on the machine
+#Results folder contains a .txt to tell you what it can't find. This should match what you know to be installed on the machine
+#This script is grouped by app so you can pull out what you need if you just want to run it for the specific applications
+
+
+#define variables
+log_folder=~/Desktop/Logs
+not_found=~/Desktop/Logs/Results/
+results=$not_found/Results.txt
+JSS=$log_folder/JSS
+protect=$log_folder/Protect
+connect=$log_folder/Connect
+trust=$log_folder/Trust
+
+#clear out previous results
+rm -r $log_folder
+
+#create a folder to save all logs
+mkdir -p $log_folder/{Results,JSS,Connect,Trust,Protect}
+
+#create a log file for script and save to Not_Found directory so users can see what logs were not gathered
+touch $results
+
+#add Jamf client log to logs folder
+if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS 
+else
+	echo "Jamf Client Logs not found" >> $results
+fi
+
+#check for jamf install logs 
+if [ -e /var/log/Install.log ]; then cp "/var/log/Install.log" $JSS 
+else
+	echo "Jamf Install Logs not found" >> $results
+fi
+
+#check for jamf system logs 
+if [ -e /var/log/system.log ]; then cp "/var/log/system.log" $JSS
+else
+	echo "Jamf System Logs not found" >> $results
+fi
+
+#find and copy jamf software plist as well as a debug log, not likely to show anything pertinent but kept in just in case
+if [ -e /Library/Preferences/com.jamfsoftware.jamf.plist ]; then cp "/Library/Preferences/com.jamfsoftware.jamf.plist" "$JSS/com.jamfsoftware.jamf.plist" | plutil -convert xml1 "$JSS/com.jamfsoftware.jamf.plist" | log show --style compact --predicate 'subsystem == "com.jamfsoftware.jamf"' --debug > "$JSS/Jamfsoftware.log"
+else
+	echo "Jamf Connect Login plist not found" >> $results
+fi
+
+#check for jamf login logs and plist
+if [ -e /tmp/jamf_login.log ]; then cp "/tmp/jamf_login.log " $connect
+else
+	echo "Jamf Login /tmp file not found" >> $results
+fi
+
+if [ -e /Library/Managed\ Preferences/com.jamf.connect.login.plist ]; then cp "/Library/Managed Preferences/com.jamf.connect.login.plist" "$connect/com.jamf.connect.login_managed.plist" | plutil -convert xml1 "$connect/com.jamf.connect.login_managed.plist" | log show --style compact --predicate 'subsystem == "com.jamf.connect.login"' --debug > "$connect/com.jamf.connect.login.log"
+else
+	echo "Jamf Connect Login plist not found" >> $results
+fi
+
+#check for jamf connect license
+LicensefromLogin=$(defaults read /Library/Managed\ Preferences/com.jamf.connect.login.plist LicenseFile 2>/dev/null)
+LicensefromMenubar=$(defaults read /Library/Managed\ Preferences/com.jamf.connect.plist LicenseFile 2>/dev/null)
+if [[ "$LicensefromLogin" == "PD94"* ]]; then
+	(echo "$LicensefromLogin" | base64 -d) > $connect/license.txt
+elif [[ "$LicensefromMenubar" == "PD94"* ]]; then
+	(echo "$LicensefromMenubar" | base64 -d) > $connect/license.txt
+else
+	file=""
+fi
+
+#check for jamf connect state plist
+State_plist=$(defaults read com.jamf.connect.state.plist 2>/dev/null)
+if [[ "$State_plist" == "" ]]; then
+	echo "A Jamf Connect State list was not found because no user is logged into Menu Bar" >> $results; else cp ~/Library/Preferences/com.jamf.connect.state.plist "$connect/com.jamf.connect.state.plist" | plutil -convert xml1 $connect/com.jamf.connect.state.plist
+	fi
+
+#check for jamf connect menu bar plist
+if [ -e /Library/Managed\ Preferences/com.jamf.connect.plist ]; then cp "/Library/Managed Preferences/com.jamf.connect.plist" "$connect/com.jamf.connect_managed.plist" | plutil -convert xml1 "$connect/com.jamf.connect_managed.plist" | log show --style compact --predicate 'subsystem == "com.jamf.connect"' --debug > "$connect/com.jamf.connect.log"
+else
+	echo "Jamf Connect plist not found" >> $results
+fi
+
+#check for kerberos ticket
+kerblist=$("klist" 2>/dev/null)
+if [[ "$kerblist" == "" ]];then
+	echo "No Kerberos Ticket for Current Logged in User" > $connect/klist_manuallyCollected.txt; else
+		echo $kerblist > $connect/klist_manuallyCollected.txt
+fi
+
+#list authchanger settings
+/usr/local/bin/authchanger -print > "$connect/authchanger_manuallyCollected.txt"
+
+
+#check for jamf protect plist
+if [ -e /Library/Managed\ Preferences/com.jamf.protect.plist ]; then cp "/Library/Managed Preferences/com.jamf.protect.plist" "$protect/com.jamf.protect.plist" | plutil -convert xml1 "$protect/com.jamf.protect.plist"
+else
+	echo "Jamf Protect plist not found" >> $results
+fi
+
+#check for jamf trust plist
+if [ -e /Library/Managed\ Preferences/com.jamf.trust.plist ]; then cp "/Library/Managed Preferences/com.jamf.trust.plist" "$trust/com.jamf.trust.plist" | plutil -convert xml1 "$trust/com.jamf.trust.plist"
+else
+	echo "Jamf Trust plist not found" >> $results
+fi
+
+
