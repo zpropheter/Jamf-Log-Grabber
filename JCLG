@@ -4,8 +4,8 @@
 
 
 #define variables
-log_folder=~/Desktop/Logs
-not_found=~/Desktop/Logs/Results/
+log_folder=$HOME/Desktop/Logs
+not_found=$HOME/Desktop/Logs/Results/
 results=$not_found/Results.txt
 connect=$log_folder/Connect
 currenttime=$(date +"%D %T")
@@ -46,7 +46,7 @@ fi
 #check for jamf connect state plist, copy, and convert to readable format
 State_plist=$(defaults read com.jamf.connect.state.plist 2>/dev/null)
 if [[ "$State_plist" == "" ]]; then
-	echo "A Jamf Connect State list was not found because no user is logged into Menu Bar" >> $results; else cp ~/Library/Preferences/com.jamf.connect.state.plist "$connect/com.jamf.connect.state.plist" | plutil -convert xml1 $connect/com.jamf.connect.state.plist
+	echo "A Jamf Connect State list was not found because no user is logged into Menu Bar" >> $results; else cp $HOME/Library/Preferences/com.jamf.connect.state.plist "$connect/com.jamf.connect.state.plist" | plutil -convert xml1 $connect/com.jamf.connect.state.plist
 	fi
 
 #check for jamf connect menu bar plist, copy, and convert to readable format
