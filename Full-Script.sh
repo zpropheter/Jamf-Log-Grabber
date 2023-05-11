@@ -8,8 +8,8 @@
 
 
 #define variables
-log_folder=~/Desktop/Logs
-not_found=~/Desktop/Logs/Results/
+log_folder=$HOME/Desktop/Logs
+not_found=$HOME/Desktop/Logs/Results/
 results=$not_found/Results.txt
 JSS=$log_folder/JSS
 protect=$log_folder/Protect
@@ -17,15 +17,31 @@ connect=$log_folder/Connect
 trust=$log_folder/Trust
 managed_preferences=$log_folder/Managed_Preferences
 profiles=$log_folder/Profiles
+recon=$log_folder/Recon
+
+currenttime=$(date +"%D %T")
 
 #clear out previous results
-rm -r $log_folder
+if [ -e $log_folder ] ;then rm -r $log_folder
+fi
 
 #create a folder to save all logs
-mkdir -p $log_folder/{Results,JSS,Connect,Trust,Protect,Managed_Preferences,Profiles}
+mkdir -p $log_folder/{Results,JSS,Connect,Trust,Protect,Managed_Preferences,Profiles,Recon}
 
 #create a log file for script and save to Not_Found directory so users can see what logs were not gathered
 touch $results
+
+#build a jamf helper to notify users that log collection will begin and to send files in to Support when completed
+buttonClicked=$(/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -windowType utility -icon /Applications/Self\ Service.app/Contents/Resources/AppIcon.icns -title "Jamf Log Grabber" -heading "Jamf Log Grabber" -description "You have been asked to send logs over to your Support Department. Press OK to start the process. When we're done, send the 'Logs' folder we put on your desktop to your Support Department" -button1 "OK" -button2 "Cancel" -defaultButton 1 -cancelButton 2)
+
+if [ $buttonClicked == 0 ]; then
+	# Buttion 1 was Clicked
+	echo "Script Ran at $currenttime" >> $results
+elif [ $buttonClicked == 2 ]; then
+	# Buttion 2 was Clicked
+	echo "Cancel was clicked at $currenttime" >> $results; else
+		exit 
+	fi
 
 #add Jamf client log to logs folder
 if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS 
@@ -52,7 +68,7 @@ else
 fi
 
 #check for jamf login logs and plist, copy, and convert to readable format
-if [ -e /tmp/jamf_login.log ]; then cp "/tmp/jamf_login.log " $connect
+if [ -e /tmp/jamf_login.log ]; then cp "/tmp/jamf_login.log" $connect
 else
 	echo "Jamf Login /tmp file not found" >> $results
 fi
@@ -76,7 +92,7 @@ fi
 #check for jamf connect state plist, copy, and convert to readable format
 State_plist=$(defaults read com.jamf.connect.state.plist 2>/dev/null)
 if [[ "$State_plist" == "" ]]; then
-	echo "A Jamf Connect State list was not found because no user is logged into Menu Bar" >> $results; else cp ~/Library/Preferences/com.jamf.connect.state.plist "$connect/com.jamf.connect.state.plist" | plutil -convert xml1 $connect/com.jamf.connect.state.plist
+	echo "A Jamf Connect State list was not found because no user is logged into Menu Bar" >> $results; else cp $HOME/Library/Preferences/com.jamf.connect.state.plist "$connect/com.jamf.connect.state.plist" | plutil -convert xml1 $connect/com.jamf.connect.state.plist
 	fi
 
 #check for jamf connect menu bar plist, copy, and convert to readable format
@@ -109,10 +125,27 @@ else
 fi
 
 #check for managed preference plists, copy, and convert to readable format
-if [ -e /Library/Managed\ Preferences/ ]; then cp /Library/Managed\ Preferences/*.plist $managed_preferences | plutil -convert xml1 $managed_preferences/*.plist
+if [ -e /Library/Managed\ Preferences/ ]; then cp /Library/Managed\ Preferences/*.plist $managed_preferences
 else
 	echo "No Managed Preferences plist files found" >> $results
 fi
+
+sleep 5
+
+#Unable to check folder for wildcart plist like *.plist 
+#If this section isn't working, find a common plist that is deployed fleet wide like notifications or system extensions and change it in the next line
+if [ -e $managed_preferences/com.apple.TCC.configuration-profile-policy.plist ]; then plutil -convert xml1 $HOME/Desktop/Logs/managed_preferences/*.plist
+else
+	echo "No files to convert to plist" > $results
+fi
+
+#checks for files left behind by recon that should have been deleted after completing recon
+if [  -f /Library/Application\ Support/JAMF/tmp/*.tmp ]; then
+	cp /Library/Application\ Support/JAMF/tmp/*.tmp $recon
+else
+	echo "No leftover shell scripts found in the recon directory" >> $results
+fi
+
 
 #list all installed user and machine profiles and saves to a .txt file
 
