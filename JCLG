@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#Jamf Log Grabber but make it just for Jamf Connect
+#JLG but make it just Jamf Connect
 
 
 #define variables
@@ -21,8 +21,14 @@ mkdir -p $log_folder/{Results,Connect,}
 touch $results
 echo "Jamf Connect Log Grabber ran on $currenttime" >>$results
 
+#outputs all historical Jamf connect logs
+log show --style compact --predicate 'subsystem == "com.jamf.connect"' --debug > $connect/JamfConnect.log
+
+#outputs all historical Jamf connect login logs
+log show --style compact --predicate 'subsystem == "com.jamf.connect.login"' --debug > $connect/jamfconnect.login.log
+
 #check for jamf login logs and plist, copy, and convert to readable format
-if [ -e /tmp/jamf_login.log ]; then cp "/tmp/jamf_login.log" $connect
+if [ -e /tmp/jamf_login.log ]; then cp "/tmp/jamf_login.log" $connect/jamf_login_tmp.log
 else
 	echo "Jamf Login /tmp file not found" >> $results
 fi
