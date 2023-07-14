@@ -31,18 +31,6 @@ mkdir -p $log_folder/{Results,JSS,Connect,Trust,Protect,Managed_Preferences,Prof
 #create a log file for script and save to Not_Found directory so users can see what logs were not gathered
 touch $results
 
-#build a jamf helper to notify users that log collection will begin and to send files in to Support when completed
-buttonClicked=$(/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -windowType utility -icon /Applications/Self\ Service.app/Contents/Resources/AppIcon.icns -title "Jamf Log Grabber" -heading "Jamf Log Grabber" -description "You have been asked to send logs over to your Support Department. Press OK to start the process. When we're done, send the 'Logs' folder we put on your desktop to your Support Department" -button1 "OK" -button2 "Cancel" -defaultButton 1 -cancelButton 2)
-
-if [ $buttonClicked == 0 ]; then
-	# Buttion 1 was Clicked
-	echo "Script Ran at $currenttime" >> $results
-elif [ $buttonClicked == 2 ]; then
-	# Buttion 2 was Clicked
-	echo "Cancel was clicked at $currenttime" >> $results; else
-		exit 
-	fi
-
 #add Jamf client log to logs folder
 if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS 
 else
@@ -67,8 +55,14 @@ else
 	echo "Jamf Connect Login plist not found" >> $results
 fi
 
+#outputs all historical Jamf connect logs
+log show --style compact --predicate 'subsystem == "com.jamf.connect"' --debug > $connect/JamfConnect.log
+
+#outputs all historical Jamf connect login logs
+log show --style compact --predicate 'subsystem == "com.jamf.connect.login"' --debug > $connect/jamfconnect.login.log
+
 #check for jamf login logs and plist, copy, and convert to readable format
-if [ -e /tmp/jamf_login.log ]; then cp "/tmp/jamf_login.log" $connect
+if [ -e /tmp/jamf_login.log ]; then cp "/tmp/jamf_login.log" $connect/jamf_login_tmp.log
 else
 	echo "Jamf Login /tmp file not found" >> $results
 fi
