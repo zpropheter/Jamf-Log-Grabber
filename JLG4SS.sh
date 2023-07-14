@@ -1,8 +1,8 @@
 #!/bin/bash
 
 currenttime=$(date +"%D %T")
-log_folder=~/Desktop/Logs
-not_found=~/Desktop/Logs/Results/
+log_folder=$HOME/Desktop/Logs
+not_found=$HOME/Desktop/Logs/Results/
 results=$not_found/Results.txt
 
 #clear out previous results
@@ -63,8 +63,14 @@ else
 	echo "Jamf Connect Login plist not found" >> $results
 fi
 
+#outputs all historical Jamf connect logs
+log show --style compact --predicate 'subsystem == "com.jamf.connect"' --debug > $connect/JamfConnect.log
+
+#outputs all historical Jamf connect login logs
+log show --style compact --predicate 'subsystem == "com.jamf.connect.login"' --debug > $connect/jamfconnect.login.log
+
 #check for jamf login logs and plist, copy, and convert to readable format
-if [ -e /tmp/jamf_login.log ]; then cp "/tmp/jamf_login.log " $connect
+if [ -e /tmp/jamf_login.log ]; then cp "/tmp/jamf_login.log" $connect/jamf_login_tmp.log
 else
 	echo "Jamf Login /tmp file not found" >> $results
 fi
@@ -88,7 +94,7 @@ fi
 #check for jamf connect state plist, copy, and convert to readable format
 State_plist=$(defaults read com.jamf.connect.state.plist 2>/dev/null)
 if [[ "$State_plist" == "" ]]; then
-	echo "A Jamf Connect State list was not found because no user is logged into Menu Bar" >> $results; else cp ~/Library/Preferences/com.jamf.connect.state.plist "$connect/com.jamf.connect.state.plist" | plutil -convert xml1 $connect/com.jamf.connect.state.plist
+	echo "A Jamf Connect State list was not found because no user is logged into Menu Bar" >> $results; else cp $HOME/Library/Preferences/com.jamf.connect.state.plist "$connect/com.jamf.connect.state.plist" | plutil -convert xml1 $connect/com.jamf.connect.state.plist
 	fi
 
 #check for jamf connect menu bar plist, copy, and convert to readable format
