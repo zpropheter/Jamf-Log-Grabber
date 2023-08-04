@@ -35,9 +35,10 @@ connect=$log_folder/Connect
 trust=$log_folder/Trust
 managed_preferences=$log_folder/Managed_Preferences
 profiles=$log_folder/Profiles
+self_service=$log_folder/Self_Service
 
 #create additional folders to save all logs
-mkdir -p $log_folder/{JSS,Connect,Trust,Protect,Managed_Preferences,Profiles}
+mkdir -p $log_folder/{JSS,Connect,Trust,Protect,Managed_Preferences,Profiles,Self_Service}
 
 #add Jamf client log to logs folder
 if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS 
@@ -55,6 +56,12 @@ fi
 if [ -e /var/log/system.log ]; then cp "/var/log/system.log" $JSS
 else
 	echo "Jamf System Logs not found" >> $results
+fi
+
+#check for jamf self service logs
+if [ -e /$HOME/Library/Logs/JAMF ]; then cp -r "$HOME/Library/Logs/JAMF/" $self_service
+else
+	echo "Jamf Self Service Logs not found" >> $results
 fi
 
 #find and copy jamf software plist, copy, and convert to readable format and copy debug log, not likely to show anything pertinent but kept in just in case
