@@ -5,6 +5,20 @@ log_folder=$HOME/Desktop/Logs
 not_found=$HOME/Desktop/Logs/Results/
 results=$not_found/Results.txt
 
+#build a jamf helper to notify users that log collection will begin and to send files in to Support when completed
+buttonClicked=$(/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -windowType utility -icon /Applications/Self\ Service.app/Contents/Resources/AppIcon.icns -title "Jamf Log Grabber" -heading "Jamf Log Grabber" -description "You have been asked to send logs over to your Support Department. Press OK to start the process. When we're done, send the 'Logs' folder we put on your desktop to your Support Department" -button1 "OK" -button2 "Cancel" -defaultButton 1 -cancelButton 2)
+
+if [ $buttonClicked == 0 ]; then
+	# Buttion 1 was Clicked
+	echo "Running"
+elif [ $buttonClicked == 2 ]; then
+	# Buttion 2 was Clicked
+	echo "Script cancelled at $currenttime" 
+	exit
+fi
+
+echo "Script Ran at $currenttime" > $results
+
 #clear out previous results
 if [ -e $log_folder ]; then
 	rm -r $log_folder;
@@ -16,17 +30,6 @@ mkdir -p $log_folder/Results
 #create a log file for script and save to Not_Found directory so users can see what logs were not gathered
 touch $results
 
-#build a jamf helper to notify users that log collection will begin and to send files in to Support when completed
-buttonClicked=$(/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -windowType utility -icon /Applications/Self\ Service.app/Contents/Resources/AppIcon.icns -title "Jamf Log Grabber" -heading "Jamf Log Grabber" -description "You have been asked to send logs over to your Support Department. Press OK to start the process. When we're done, send the 'Logs' folder we put on your desktop to your Support Department" -button1 "OK" -button2 "Cancel" -defaultButton 1 -cancelButton 2)
-
-if [ $buttonClicked == 0 ]; then
-	# Buttion 1 was Clicked
-	echo "Script Ran at $currenttime" > $results
-elif [ $buttonClicked == 2 ]; then
-	# Buttion 2 was Clicked
-	echo "Script cancelled at $currenttime" > $results
-	exit
-	fi
 
 #create additional variables to continue running
 JSS=$log_folder/JSS
@@ -145,3 +148,13 @@ profiles show > $profiles/User_Installed_Profiles.txt
 
 #remove comment to see machine profiles but requires sudo priveliges 
 # sudo profiles show > $profiles/Machine_Installed_Profiles.txt
+
+#build a jamf helper to notify users that log collection is completed
+buttonClicked2=$(/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -icon "/Applications/Self Service.app/Contents/Resources/AppIcon.icns" -windowType utility -title "Jamf Log Grabber" -defaultButton 1 -description "Log collection has completed, please forward the "Logs" folder on your desktop your your Support Department." -heading "Finished" -button1 "Close")
+
+if [ $buttonClicked2 == 0 ]; then
+	# User received the confirmation helper that script completed
+	echo "Script completed at $currenttime" > $results
+else
+	echo "Jamf Helper did not notify user that log collection was complete" > $results
+fi
