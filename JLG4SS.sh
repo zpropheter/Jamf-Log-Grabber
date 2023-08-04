@@ -17,8 +17,6 @@ elif [ $buttonClicked == 2 ]; then
 	exit
 fi
 
-echo "Script Ran at $currenttime" > $results
-
 #clear out previous results
 if [ -e $log_folder ]; then
 	rm -r $log_folder;
@@ -30,6 +28,7 @@ mkdir -p $log_folder/Results
 #create a log file for script and save to Not_Found directory so users can see what logs were not gathered
 touch $results
 
+echo "Script Ran at $currenttime" > $results
 
 #create additional variables to continue running
 JSS=$log_folder/JSS
