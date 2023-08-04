@@ -18,6 +18,7 @@ trust=$log_folder/Trust
 managed_preferences=$log_folder/Managed_Preferences
 profiles=$log_folder/Profiles
 recon=$log_folder/Recon
+self_service=$log_folder/Self_Service
 
 currenttime=$(date +"%D %T")
 
@@ -26,7 +27,7 @@ if [ -e $log_folder ] ;then rm -r $log_folder
 fi
 
 #create a folder to save all logs
-mkdir -p $log_folder/{Results,JSS,Connect,Trust,Protect,Managed_Preferences,Profiles,Recon}
+mkdir -p $log_folder/{Results,JSS,Connect,Trust,Protect,Managed_Preferences,Profiles,Recon,Self_Service}
 
 #create a log file for script and save to Not_Found directory so users can see what logs were not gathered
 touch $results
@@ -47,6 +48,12 @@ fi
 if [ -e /var/log/system.log ]; then cp "/var/log/system.log" $JSS
 else
 	echo "Jamf System Logs not found" >> $results
+fi
+
+#check for jamf self service logs
+if [ -e /$HOME/Library/Logs/JAMF ]; then cp -r "$HOME/Library/Logs/JAMF/" $self_service
+else
+	echo "Jamf Self Service Logs not found" >> $results
 fi
 
 #find and copy jamf software plist, copy, and convert to readable format and copy debug log, not likely to show anything pertinent but kept in just in case
