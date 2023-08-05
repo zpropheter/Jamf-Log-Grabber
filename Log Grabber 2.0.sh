@@ -1,30 +1,35 @@
 #!/bin/bash
 
-#You can now set variables to collect specific logs, simply comment out any lines you do not want to run
-JSS_LOGS=('Collect')
-Recon_Troubleshoot=('Collect')
-Jamf_Self_Service=('Collect')
-Jamf_Connect=('Collect')
-Jamf_Protect=('Collect')
-Managed_Preferences_Folder=('Collect')
-All_Profiles=('Collect')
-cleanup=("JSS Recon Self_Service Connect Security Managed_Preferences")
+#!/bin/bash
+
+#Set variables equal to true for any items you want collected, if it does not = true it will not run
+JSS_LOGS=True
+Recon_Troubleshoot=True
+Jamf_Self_Service=True
+Jamf_Connect=True
+Jamf_Protect=True
+Managed_Preferences_Folder=True
+All_Profiles=True
+
+#If a variable above is turned off, remove the folder name for it here to avoid errors with the cleanup function at the end of the script
+cleanup=("JSS Recon Self_Service Connect Jamf_Security Managed_Preferences")
 
 
-#define variables
+#Hard coded variables
 log_folder=$HOME/Desktop/Logs
 results=$log_folder/Results.txt
 JSS=$log_folder/JSS
 security=$log_folder/Jamf_Security
 connect=$log_folder/Connect
-trust=$log_folder/Trust
 managed_preferences=$log_folder/Managed_Preferences
-profiles=$log_folder/Profiles
 recon=$log_folder/Recon
 self_service=$log_folder/Self_Service
 loggedInUser=$( echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }' )
 
+#date for log folder zip creation
 currentlogdate=$(date)
+
+#time and date for results.txt information
 currenttime=$(date +"%D %T")
 
 #clear out previous results
@@ -37,10 +42,16 @@ mkdir -p $log_folder
 #create a log file for script and save to Logs directory so users can see what logs were not gathered
 touch $results
 
-#Section for collecting client side JSS Logs
-for logfileJSS in "${JSS_LOGS[@]}"
-do
+#set a time and date stamp for when the log grabber was ran
+echo "Log Grabber was started at '$currenttime'" >> $results
+
+if [[ "$JSS_LOGS" == True ]];then
 	mkdir -p $log_folder/JSS
+	#find and copy jamf software plist, copy, and convert to readable format and copy debug log, not likely to show anything pertinent but kept in just in case
+	if [ -e /Library/Preferences/com.jamfsoftware.jamf.plist ]; then cp "/Library/Preferences/com.jamfsoftware.jamf.plist" "$JSS/com.jamfsoftware.jamf.plist" | plutil -convert xml1 "$JSS/com.jamfsoftware.jamf.plist" | log show --style compact --predicate 'subsystem == "com.jamfsoftware.jamf"' --debug > "$JSS/Jamfsoftware.log"
+	else
+		echo "Jamf Software plist not found" >> $results
+	fi
 	#add Jamf client log to logs folder
 	if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS
 	else
@@ -61,11 +72,12 @@ do
 	else
 		echo "Jamf Connect Login plist not found" >> $results
 	fi
-done
+else
+		echo "JSS Log Collection turned off" >> $results
+fi
 
 #Section for collecting Jamf Recon Leftovers
-for logfileRecon in "${Recon_Troubleshoot[@]}"
-do
+if [[ "$Recon_Troubleshoot" == True ]];then
 	mkdir -p $log_folder/Recon
 	#check for Jamf Recon leftovers
 	if [  -f /Library/Application\ Support/JAMF/tmp/*.tmp ]; then
@@ -73,32 +85,27 @@ do
 	else
 		echo "No leftover shell scripts found in the recon directory" >> $results
 	fi
-done
+else
+	echo "Recon Troubleshoot turned off" >>$results
+fi
 
-#Section for collecting Jamf Self Service Logs
-for logfileSelfService in "${Jamf_Self_Service[@]}"
-do
+if [[ "$Jamf_Self_Service" == True ]];then
 	mkdir -p $log_folder/Self_Service
 	#check for jamf self service logs
 	if [ -e /$HOME/Library/Logs/JAMF ]; then cp -r "$HOME/Library/Logs/JAMF/" $self_service
 	else
 		echo "Jamf Self Service Logs not found" >> $results
 	fi
-done
+else
+	echo "Jamf Self Service Log Collection turned off" >> $results
+fi
 
 #Section for collecting Jamf Connect Logs
-for logfileJamfConnect in "${Jamf_Connect[@]}"
-do
+if [[ "$Jamf_Connect" == True ]];then
 	mkdir -p $log_folder/Connect
-	#find and copy jamf software plist, copy, and convert to readable format and copy debug log, not likely to show anything pertinent but kept in just in case
-	if [ -e /Library/Preferences/com.jamfsoftware.jamf.plist ]; then cp "/Library/Preferences/com.jamfsoftware.jamf.plist" "$JSS/com.jamfsoftware.jamf.plist" | plutil -convert xml1 "$JSS/com.jamfsoftware.jamf.plist" | log show --style compact --predicate 'subsystem == "com.jamfsoftware.jamf"' --debug > "$JSS/Jamfsoftware.log"
-	else
-		echo "Jamf Connect Login plist not found" >> $results
-	fi
-	
 	#create a log file for script and save to Logs directory so users can see what logs were not gathered
 	touch $results	
-	if [ -e /Library/Preferences/com.jamfsoftware.jamf.plist ]; then
+	if [ -e /Library/Managed\ Preferences/com.jamf.connect.plist ]; then
 		#outputs all historical Jamf connect logs, this will always generate a log file even if Connect is 
 		log show --style compact --predicate 'subsystem == "com.jamf.connect"' --debug > $connect/JamfConnect.log
 		#outputs all historical Jamf connect login logs
@@ -106,7 +113,8 @@ do
 		kerberioscheck=$(kerblist=$("klist" 2>/dev/null)
 	if [[ "$kerblist" == "" ]];then
 		echo "No Kerberos Ticket for Current Logged in User" > $connect/klist_manuallyCollected.txt; else
-			echo $kerblist > $connect/klist_manuallyCollected.txt);else
+			echo $kerblist > $connect/klist_manuallyCollected.txt
+fi);else
 	echo "No Jamf Connect Installed, doing nothing" >> $results
 	fi
 	
@@ -149,29 +157,31 @@ do
 		/usr/local/bin/authchanger -print > "$connect/authchanger_manuallyCollected.txt";else
 			echo "No Authchanger settings found" >> $results
 		fi
-done
+else
+	echo "Jamf Connect Log Collection turned off" >> $results
+fi
 
 #Section for collecting Jamf Self Service Logs
-for logfileJamfSecurity in "${Jamf_Protect[@]}"
-do
+if [[ "$Jamf_Protect" == True ]];then
 	#make directory for all Jamf Security related files
-	mkdir -p $log_folder/Security
+	mkdir -p $log_folder/Jamf_Security
 	#check for jamf protect plist, copy, and convert to readable format
-	if [ -e /Library/Managed\ Preferences/com.jamf.protect.plist ]; then cp "/Library/Managed Preferences/com.jamf.protect.plist" "$protect/com.jamf.protect.plist" | plutil -convert xml1 "$security/com.jamf.protect.plist"
+	if [ -e /Library/Managed\ Preferences/com.jamf.protect.plist ]; then cp "/Library/Managed Preferences/com.jamf.protect.plist" "$security/com.jamf.protect.plist" | plutil -convert xml1 "$security/com.jamf.protect.plist"
 	else
 		echo "Jamf Protect plist not found" >> $results
 	fi
 	
 	#check for jamf trust plist, copy, and convert to readable format
-	if [ -e /Library/Managed\ Preferences/com.jamf.trust.plist ]; then cp "/Library/Managed Preferences/com.jamf.trust.plist" "$trust/com.jamf.trust.plist" | plutil -convert xml1 "$security/com.jamf.trust.plist"
+	if [ -e /Library/Managed\ Preferences/com.jamf.trust.plist ]; then cp "/Library/Managed Preferences/com.jamf.trust.plist" "$security/com.jamf.trust.plist" | plutil -convert xml1 "$security/com.jamf.trust.plist"
 	else
 		echo "Jamf Trust plist not found" >> $results
 	fi
-done
+else
+	echo "Jamf Connect Log Collection turned off"
+fi
 
 #Section for collecting Managed Preference Plists
-for logfileManagedPreferences in "${Managed_Preferences_Folder[@]}"
-do
+if [[ "$Managed_Preferences_Folder" == True ]];then
 	mkdir -p $log_folder/Managed_Preferences
 	#check for managed preference plists, copy, and convert to readable format
 	if [ -e /Library/Managed\ Preferences/ ]; then cp /Library/Managed\ Preferences/*.plist $managed_preferences
@@ -192,7 +202,9 @@ do
 	
 	#remove comment to see machine profiles but requires sudo priveliges 
 	# sudo profiles show > $log_folder/User_Installed_Profiles.txt
-done
+else
+	echo "Managed Preferences Plist Collection turned off"
+fi
 
 #cleans out empty folders to avoid confusion
 for emptyfolder in $cleanup
@@ -204,6 +216,11 @@ else
 fi
 done
 
+#Stamp time completed before zipping files
+echo "Completed Log Grabber on '$currenttime" >> $results
+
+#zip it all up for attaching to an email
 zip $HOME/Desktop/"$loggedInUser"_logs_collected_"$currentlogdate".zip -r $log_folder
 
 rm -r $log_folder
+
