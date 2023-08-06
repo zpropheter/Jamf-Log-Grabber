@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#Deprecated in favor of Log Grabber 2.0 as of 8/5/23
+
 #This script is designed to grab every Jamf Log you can think of when you're troubleshooting.
 #Jamf Connect files are labeled as you would find them by using the menu bar> about> collect logs
 #All other files are labeled as you would find them on the machine
