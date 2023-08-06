@@ -1,7 +1,5 @@
 #!/bin/bash
 
-#!/bin/bash
-
 #Set variables equal to true for any items you want collected, if it does not = true it will not run
 JSS_LOGS=True
 Recon_Troubleshoot=True
@@ -9,6 +7,12 @@ Jamf_Self_Service=True
 Jamf_Connect=True
 Jamf_Protect=True
 Managed_Preferences_Folder=True
+
+#Turn on/off notifications to users that you're collecting logs
+#Start Notification allows users to cancel or continue, log collection should not utilize enough resources to affect users
+Start_Notification=True
+#Finish notification tells users that the process is complete and what to do with the file on their desktop. It does run before zipping is complete to allow the results.txt to be updated.
+Finish_Notification=True
 
 #If a variable above is turned off, remove the folder name for it here to avoid errors with the cleanup function at the end of the script
 cleanup=("JSS Recon Self_Service Connect Jamf_Security Managed_Preferences")
@@ -30,6 +34,22 @@ currentlogdate=$(date)
 
 #time and date for results.txt information
 currenttime=$(date +"%D %T")
+
+if [[ "$Start_Notification" == True ]];then
+#build a jamf helper to notify users that log collection will begin and to send files in to Support when completed
+buttonClicked=$(/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -windowType utility -icon /Applications/Self\ Service.app/Contents/Resources/AppIcon.icns -title "Jamf Log Grabber" -heading "Jamf Log Grabber" -description "You have been asked to send logs over to your Support Department. Press OK to start the process. When we're done, send the zipped folder with your name and the date on it that we put on your desktop to your Support Department" -button1 "OK" -button2 "Cancel" -defaultButton 1 -cancelButton 2)
+
+if [[ $buttonClicked == 0 ]]; then
+	# Buttion 1 was Clicked
+	echo "Running"
+elif [[ $buttonClicked == 2 ]]; then
+	# Buttion 2 was Clicked
+	echo "Script cancelled at '$currenttime'" 
+	exit
+fi
+else
+	echo "Start Notification turned off"
+fi
 
 #clear out previous results
 if [ -e $log_folder ] ;then rm -r $log_folder
@@ -214,12 +234,27 @@ else
 	echo "$emptyfolder is Not Empty leaving folder" >>$results
 fi
 done
+			
+if [[ "$Finish_Notification" == True ]];then
+#build a jamf helper to notify users that log collection is completed
+buttonClicked2=$(/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -icon "/Applications/Self Service.app/Contents/Resources/AppIcon.icns" -windowType utility -title "Jamf Log Grabber" -defaultButton 1 -description "Log collection has completed, please forward the zipped file with your name and the date to your Support Department." -heading "Finished" -button1 "Close")
+				
+if [ $buttonClicked2 == 0 ]; then
+# User received the confirmation helper that script completed
+echo "Script completed at $currenttime" > $results
+else
+echo "Jamf Helper did not notify user that log collection was complete" > $results
+fi
+else
+echo "Finish notification turned off" > $results
+fi
 
 #Stamp time completed before zipping files
-echo "Completed Log Grabber on '$currenttime" >> $results
+echo "Completed Log Grabber on '$currenttime'" >> $results
 
 #zip it all up for attaching to an email
 zip $HOME/Desktop/"$loggedInUser"_logs_collected_"$currentlogdate".zip -r $log_folder
 
 rm -r $log_folder
+
 
