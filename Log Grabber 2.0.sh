@@ -9,7 +9,6 @@ Jamf_Self_Service=True
 Jamf_Connect=True
 Jamf_Protect=True
 Managed_Preferences_Folder=True
-All_Profiles=True
 
 #If a variable above is turned off, remove the folder name for it here to avoid errors with the cleanup function at the end of the script
 cleanup=("JSS Recon Self_Service Connect Jamf_Security Managed_Preferences")
