@@ -5,6 +5,8 @@ log_folder=$HOME/Desktop/Logs
 not_found=$HOME/Desktop/Logs/Results/
 results=$not_found/Results.txt
 
+#Deprecated in favor of Log Grabber 2.0 as of 8/5/23
+
 #build a jamf helper to notify users that log collection will begin and to send files in to Support when completed
 buttonClicked=$(/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -windowType utility -icon /Applications/Self\ Service.app/Contents/Resources/AppIcon.icns -title "Jamf Log Grabber" -heading "Jamf Log Grabber" -description "You have been asked to send logs over to your Support Department. Press OK to start the process. When we're done, send the 'Logs' folder we put on your desktop to your Support Department" -button1 "OK" -button2 "Cancel" -defaultButton 1 -cancelButton 2)
 
