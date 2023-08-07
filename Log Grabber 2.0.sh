@@ -11,8 +11,21 @@ Jamf_Self_Service=FALSE
 Jamf_Connect=FALSE
 Jamf_Protect=FALSE
 Managed_Preferences_Folder=FALSE
-Start_Notification=FALSE
-Finish_Notification=FALSE
+Start_Notification=TRUE
+Finish_Notification=TRUE
+
+#If Start_Notification is set to 'TRUE' use this to CUSTOMIZE YOUR START NOTIFICATION FROM JAMF HELPER BY EDITING THE QUOTED ITEMS OF EACH VARIABLE
+Start_Notification_Title=$(echo "Support Desk Notification")
+Start_Notification_Heading=$(echo "Jamf Log Grabber")
+Start_Notification_Description=$(echo "You have been asked to send logs over to your Support Department. Press OK to start the process. An additional notification will show when completed.")
+Start_Notification_Confirm_Button=$(echo "Start")
+Start_Notification_Cancel_Button=$(echo "Cancel")
+
+#If Finish_Notification is set to 'TRUE' use this to CUSTOMIZE YOUR START NOTIFICATION FROM JAMF HELPER BY EDITING THE QUOTED ITEMS OF EACH VARIABLE
+Finish_Notification_Title=$(echo "Support Desk Notification")
+Finish_Notification_Heading=$(echo "Jamf Log Grabber")
+Finish_Notification_Description=$(echo "Log collection has completed, please forward the zipped file with your name and the date to your Support Department.")
+Finish_Notification_Confirm_Button=$(echo "OK")
 
 #IF A VARIABLE ABOVE IS SET TO 'FALSE', REMOVE THE FOLDER NAME FOR IT BELOW TO AVOID ERRORS WITH THE CLEANUP FUNCTION AT THE END OF THE SCRIPT
 cleanup=("JSS Recon Self_Service Connect Jamf_Security Managed_Preferences")
@@ -38,7 +51,7 @@ currenttime=$(date +"%D %T")
 #START NOTIFICATION CALLS JAMF HELPER TO NOTIFY USERS THAT LOG COLLECTION IS BEGINNING AND ADVISES THEM OF BEHAVIOR TO LOOK FOR WHEN COMPLETED.
 if [[ "$Start_Notification" == TRUE ]];then
 	#BUILD A JAMF HELPER TO NOTIFY USERS THAT LOG COLLECTION WILL BEGIN AND TO SEND FILES IN TO SUPPORT WHEN COMPLETED
-buttonClicked=$(/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -windowType utility -icon /Applications/Self\ Service.app/Contents/Resources/AppIcon.icns -title "Jamf Log Grabber" -heading "Jamf Log Grabber" -description "You have been asked to send logs over to your Support Department. Press OK to start the process. An additional notification will show when completed." -button1 "OK" -button2 "Cancel" -defaultButton 1 -cancelButton 2)
+	buttonClicked=$(/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -windowType utility -icon /Applications/Self\ Service.app/Contents/Resources/AppIcon.icns -title "$Start_Notification_Title" -heading "$Start_Notification_Heading" -description "$Start_Notification_Description" -button1 "$Start_Notification_Confirm_Button" -button2 "$Start_Notification_Cancel_Button" -defaultButton 1 -cancelButton 2)
 
 if [[ $buttonClicked == 0 ]]; then
 	# BUTTON 1 WAS CLICKED
@@ -256,7 +269,7 @@ done
 			
 if [[ "$Finish_Notification" == TRUE ]];then
 #BUILD A JAMF HELPER TO NOTIFY USERS THAT LOG COLLECTION IS COMPLETED
-buttonClicked2=$(/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -icon "/Applications/Self Service.app/Contents/Resources/AppIcon.icns" -windowType utility -title "Jamf Log Grabber" -defaultButton 1 -description "Log collection has completed, please forward the zipped file with your name and the date to your Support Department." -heading "Finished" -button1 "Close")
+buttonClicked2=$(/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -icon "/Applications/Self Service.app/Contents/Resources/AppIcon.icns" -windowType utility -title "$Finish_Notification_Title" -defaultButton 1 -description "$Finish_Notification_Description" -heading "$Finish_Notification_Heading" -button1 "$Finish_Notification_Confirm_Button")
 				
 if [ $buttonClicked2 == 0 ]; then
 #USER RECEIVED THE CONFIRMATION HELPER THAT SCRIPT COMPLETED
