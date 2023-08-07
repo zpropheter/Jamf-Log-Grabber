@@ -6,13 +6,13 @@
 
 #VARIABLES MUST BE SET TO 'TRUE' OR 'FALSE' AND ARE CASE SENSITIVE
 JSS_LOGS=FALSE
-Recon_Troubleshoot=FALSE
+Recon_Troubleshoot=TRUE
 Jamf_Self_Service=FALSE
-Jamf_Connect=FALSE
+Jamf_Connect=FALSe
 Jamf_Protect=FALSE
 Managed_Preferences_Folder=FALSE
-Start_Notification=TRUE
-Finish_Notification=TRUE
+Start_Notification=FALSE
+Finish_Notification=FALSE
 
 #If Start_Notification is set to 'TRUE' use this to CUSTOMIZE YOUR START NOTIFICATION FROM JAMF HELPER BY EDITING THE QUOTED ITEMS OF EACH VARIABLE
 Start_Notification_Title=$(echo "Support Desk Notification")
@@ -41,6 +41,7 @@ managed_preferences=$log_folder/Managed_Preferences
 recon=$log_folder/Recon
 self_service=$log_folder/Self_Service
 loggedInUser=$( echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }' )
+reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/)
 
 #DATE FOR LOG FOLDER ZIP CREATION
 currentlogdate=$(date)
@@ -120,10 +121,10 @@ fi
 if [[ "$Recon_Troubleshoot" == TRUE ]];then
 	mkdir -p $log_folder/Recon
 	#check for Jamf Recon leftovers
-	if [  -f /Library/Application\ Support/JAMF/tmp/*.tmp ]; then
-		cp /Library/Application\ Support/JAMF/tmp/*.tmp $recon
+	if [[ $reconleftovers == "" ]]; then
+		echo "Recon Folder clean" >> $results
 	else
-		echo "No leftover shell scripts found in the recon directory" >> $results
+		echo $reconleftovers > $recon/Leftovers.txt
 	fi
 elif [[ "$Recon_Troubleshoot" == FALSE ]];then
 	echo "Recon Troubleshoot turned off" >> $results
@@ -287,8 +288,11 @@ fi
 echo "Completed Log Grabber on '$currenttime'" >> $results
 
 #ZIP IT ALL UP FOR ATTACHMENT TO AN EMAIL
-zip $HOME/Desktop/"$loggedInUser"_logs_collected_"$currentlogdate".zip -r $log_folder
+
+#SET WORKING DIRECTORY TO DESKTOP
+cd $HOME/Desktop
+
+#NAME ZIPPED FOLDER WITH LOGGED IN USER AND TIME
+zip $HOME/Desktop/"$loggedInUser"_logs_collected_"$currentlogdate".zip -r Logs
 
 rm -r $log_folder
-
-
