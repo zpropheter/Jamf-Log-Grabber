@@ -36,7 +36,7 @@ currentlogdate=$(date)
 currenttime=$(date +"%D %T")
 
 #START NOTIFICATION CALLS JAMF HELPER TO NOTIFY USERS THAT LOG COLLECTION IS BEGINNING AND ADVISES THEM OF BEHAVIOR TO LOOK FOR WHEN COMPLETED.
-if [[ "$Start_Notification" == True ]];then
+if [[ "$Start_Notification" == TRUE ]];then
 	#BUILD A JAMF HELPER TO NOTIFY USERS THAT LOG COLLECTION WILL BEGIN AND TO SEND FILES IN TO SUPPORT WHEN COMPLETED
 buttonClicked=$(/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -windowType utility -icon /Applications/Self\ Service.app/Contents/Resources/AppIcon.icns -title "Jamf Log Grabber" -heading "Jamf Log Grabber" -description "You have been asked to send logs over to your Support Department. Press OK to start the process. An additional notification will show when completed." -button1 "OK" -button2 "Cancel" -defaultButton 1 -cancelButton 2)
 
