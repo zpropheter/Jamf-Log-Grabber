@@ -5,15 +5,15 @@
 
 
 #VARIABLES MUST BE SET TO 'TRUE' OR 'FALSE' AND ARE CASE SENSITIVE
-JSS_LOGS=FALSE
+JSS_LOGS=TRUE
 Recon_Troubleshoot=TRUE
-Jamf_Self_Service=FALSE
-Jamf_Connect=FALSE
-Jamf_Protect=FALSE
-Managed_Preferences_Folder=FALSE
+Jamf_Self_Service=TRUE
+Jamf_Connect=TRUE
+Jamf_Protect=TRUE
+Managed_Preferences_Folder=TRUE
 Start_Notification=FALSE
 Finish_Notification=FALSE
-ZIP_Folder=TRUE
+ZIP_Folder=FALSE
 
 #If Start_Notification is set to 'TRUE' use this to CUSTOMIZE YOUR START NOTIFICATION FROM JAMF HELPER BY EDITING THE QUOTED ITEMS OF EACH VARIABLE
 Start_Notification_Title=$(echo "Support Desk Notification")
@@ -80,7 +80,7 @@ mkdir -p $log_folder
 touch $results
 
 #SET A TIME AND DATE STAMP FOR WHEN THE LOG GRABBER WAS RAN
-echo "Log Grabber was started at '$currenttime'" >> $results
+echo -e "Log Grabber was started at '$currenttime'\n" >> $results
 
 #LOG COLLECTION FOR JAMF BINARY
 if [[ "$JSS_LOGS" == TRUE ]];then
@@ -89,33 +89,34 @@ if [[ "$JSS_LOGS" == TRUE ]];then
 	#COPY DEBUG LOG
 	if [ -e /Library/Preferences/com.jamfsoftware.jamf.plist ]; then cp "/Library/Preferences/com.jamfsoftware.jamf.plist" "$JSS/com.jamfsoftware.jamf.plist" | plutil -convert xml1 "$JSS/com.jamfsoftware.jamf.plist" | log show --style compact --predicate 'subsystem == "com.jamfsoftware.jamf"' --debug > "$JSS/Jamfsoftware.log"
 	else
-		echo "Jamf Software plist not found" >> $results
+		echo -e "Jamf Software plist not found\n" >> $results
 	fi
 	#ADD JAMF CLIENT LOGS TO LOG FOLDER
 	if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS
+		echo -e "Jamf.log found on machine for information about what this reports visit this URL:\nhttps://learn.jamf.com/bundle/jamf-pro-documentation-current/page/Components_Installed_on_Managed_Computers.html\n" >> $results
 	else
-		echo "Jamf Client Logs not found" >> $results
+		echo -e "Jamf Client Logs not found\n" >> $results
 	fi
 	#CHECK FOR JAMF INSTALL LOGS
 	if [ -e /var/log/install.log ]; then cp "/var/log/install.log" $JSS 
 	else
-		echo "Install Logs not found" >> $results
+		echo -e "Install Logs not found\n" >> $results
 	fi
 	#CHECK FOR JAMF SYSTEM LOGS
 	if [ -e /var/log/system.log ]; then cp "/var/log/system.log" $JSS
 	else
-		echo "System Logs not found" >> $results
+		echo -e "System Logs not found\n" >> $results
 	fi
 	#FIND AND COPY JAMF SOFTWARE PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
 	#COPY DEBUG LOG
 	if [ -e /Library/Preferences/com.jamfsoftware.jamf.plist ]; then cp "/Library/Preferences/com.jamfsoftware.jamf.plist" "$JSS/com.jamfsoftware.jamf.plist" | plutil -convert xml1 "$JSS/com.jamfsoftware.jamf.plist" | log show --style compact --predicate 'subsystem == "com.jamfsoftware.jamf"' --debug > "$JSS/Jamfsoftware.log"
 	else
-		echo "Jamf Connect Login plist not found" >> $results
+		echo -e "Jamf Connect Login plist not found\n" >> $results
 	fi
 elif [[ "$JSS_LOGS" == FALSE ]];then
-		echo "JSS Log Collection turned off" >> $results
+		echo -e "JSS Log Collection turned off\n" >> $results
 else
-	echo "JSS Log Collection variable set to invalid value"
+	echo -e "JSS Log Collection variable set to invalid value\n" >>$results
 fi
 
 #JAMF RECON TROUBLESHOOTING
@@ -123,14 +124,16 @@ if [[ "$Recon_Troubleshoot" == TRUE ]];then
 	mkdir -p $log_folder/Recon
 	#check for Jamf Recon leftovers
 	if [[ $reconleftovers == "" ]]; then
-		echo "Recon Folder clean" >> $results
+		echo -e "Recon Folder Empty, we love to see that!\n" >> $results
 	else
 		echo $reconleftovers > $recon/Leftovers.txt
+		#DIAGNOSTIC INFORMATION FOR RECON RESULTS. FOLLOWING THESE STEPS WILL HELP IDENTIFY PROBLEMATIC EXTENSION ATTRIBUTES AND/OR INVENTORY CHECK IN PROBLEMS
+		echo -e "\nRecon leftovers found and listed above\nTo remediate, take the following steps:\n1. Open Terminal\n2.Type 'rm -r /Library/Application\ Support/JAMF/tmp/*'\nThis will remove all temporary files in the folder and allow the inventory update to complete.\nSometimes these files get stuck, so this helps reset them.\nIf the files come back:\n1. Run a 'cat /Library/Application\ Support/JAMF/tmp/temporaryfilename'\n2. Find the extension attribute that matches the output from the command and disable or delete it until the root cause is identified\n" >> $recon/Leftovers.txt
 	fi
 elif [[ "$Recon_Troubleshoot" == FALSE ]];then
-	echo "Recon Troubleshoot turned off" >> $results
+	echo -e "Recon Troubleshoot turned off\n" >> $results
 else
-	echo "Recon Troubleshoot variable set to invalid value"
+	echo -e "Recon Troubleshoot variable set to invalid value\n" >> $results
 fi
 
 #JAMF SELF SERVICE LOG COLLECTION
@@ -139,12 +142,12 @@ if [[ "$Jamf_Self_Service" == TRUE ]];then
 	#check for jamf self service logs
 	if [ -e /$HOME/Library/Logs/JAMF ]; then cp -r "$HOME/Library/Logs/JAMF/" $self_service
 	else
-		echo "Jamf Self Service Logs not found" >> $results
+		echo -e "Jamf Self Service Logs not found\n" >> $results
 	fi
 elif [[ "$Jamf_Self_Service" == FALSE ]];then
-	echo "Jamf Self Service log collection turned off" >> $results
+	echo -e "Jamf Self Service log collection turned off\n" >> $results
 else
-	echo "Jamf Self Service log collection variable set to invalid value"
+	echo -e "Jamf Self Service log collection variable set to invalid value\n" $results
 fi
 
 #JAMF CONNECT LOG COLLECTION
@@ -162,17 +165,17 @@ if [[ "$Jamf_Connect" == TRUE ]];then
 		echo "No Kerberos Ticket for Current Logged in User" > $connect/klist_manuallyCollected.txt; else
 			echo $kerblist > $connect/klist_manuallyCollected.txt
 fi);else
-	echo "No Jamf Connect Installed, doing nothing" >> $results
+	echo -e "No Jamf Connect Installed, doing nothing\n" >> $results
 	fi
 	#CHECK FOR JAMF CONNECT LOGIN LOGS AND PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
 	if [ -e /tmp/jamf_login.log ]; then cp "/tmp/jamf_login.log" $connect/jamf_login_tmp.log
 	else
-		echo "Jamf Login /tmp file not found" >> $results
+		echo -e "Jamf Login /tmp file not found\nThis usually only exists on recent installs.\nDon't worry if you don't see anything. We're just being thorough.\n" >> $results
 	fi
 	
 	if [ -e /Library/Managed\ Preferences/com.jamf.connect.login.plist ]; then cp "/Library/Managed Preferences/com.jamf.connect.login.plist" "$connect/com.jamf.connect.login_managed.plist" | plutil -convert xml1 "$connect/com.jamf.connect.login_managed.plist" | log show --style compact --predicate 'subsystem == "com.jamf.connect.login"' --debug > "$connect/com.jamf.connect.login.log"
 	else
-		echo "Jamf Connect Login plist not found" >> $results
+		echo -e "Jamf Connect Login plist not found\n" >> $results
 	fi
 	
 	#CHECK FOR JAMF CONNECT LICENSE, THEN COPY AND CONVERT TO A READABLE FORMAT
@@ -189,24 +192,25 @@ fi);else
 	#CHECK FOR JAMF CONNECT STATE PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
 	State_plist=$(defaults read com.jamf.connect.state.plist 2>/dev/null)
 	if [[ "$State_plist" == "" ]]; then
-		echo "A Jamf Connect State list was not found because no user is logged into Menu Bar" >> $results; else cp $HOME/Library/Preferences/com.jamf.connect.state.plist "$connect/com.jamf.connect.state.plist" | plutil -convert xml1 $connect/com.jamf.connect.state.plist
+		echo -e "A Jamf Connect State list was not found because no user is logged into Menu Bar\n" >> $results; else cp $HOME/Library/Preferences/com.jamf.connect.state.plist "$connect/com.jamf.connect.state.plist" | plutil -convert xml1 $connect/com.jamf.connect.state.plist
 		fi
 	
 	#CHECK FOR JAMF CONNECT MENU BAR PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
 	if [ -e /Library/Managed\ Preferences/com.jamf.connect.plist ]; then cp "/Library/Managed Preferences/com.jamf.connect.plist" "$connect/com.jamf.connect_managed.plist" | plutil -convert xml1 "$connect/com.jamf.connect_managed.plist" | log show --style compact --predicate 'subsystem == "com.jamf.connect"' --debug > "$connect/com.jamf.connect.log"
 	else
-		echo "Jamf Connect plist not found" >> $results
+		echo -e "Jamf Connect plist not found\n" >> $results
 	fi
 	
 	#LIST AUTHCHANGER SETTIGNS
 	if [ -e /usr/local/bin/authchanger ]; then
-		/usr/local/bin/authchanger -print > "$connect/authchanger_manuallyCollected.txt";else
-			echo "No Authchanger settings found" >> $results
+		/usr/local/bin/authchanger -print > "$connect/authchanger_manuallyCollected.txt"
+		echo -e "Authchanger changes the authentication database for MacOS.\nMore info can be found at this URL:\nhttps://learn.jamf.com/bundle/jamf-connect-documentation-current/page/authchanger.html\nReview the authchanger_manuallyCollected.txt file to see your settings and determine if Authchanger needs to be modified for your environment." >> $results;else
+			echo -e "No Authchanger settings found\n" >> $results
 		fi
 elif [[ "$Jamf_Connect" == FALSE ]];then
-echo "Jamf Connect log collection turned off" >> $results
+echo -e "Jamf Connect log collection turned off\n" >> $results
 else
-echo "Jamf Connect log collection variable set to invalid value"
+echo -e"Jamf Connect log collection variable set to invalid value\n"
 fi
 
 #JAMF SECURITY LOG COLLECTION
@@ -216,18 +220,18 @@ if [[ "$Jamf_Protect" == TRUE ]];then
 	#CHECK FOR JAMF PROTECT PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
 	if [ -e /Library/Managed\ Preferences/com.jamf.protect.plist ]; then cp "/Library/Managed Preferences/com.jamf.protect.plist" "$security/com.jamf.protect.plist" | plutil -convert xml1 "$security/com.jamf.protect.plist"
 	else
-		echo "Jamf Protect plist not found" >> $results
+		echo -e "Jamf Protect plist not found\n" >> $results
 	fi
 	
-	#CHECK FO RJAMF TRUST PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
+	#CHECK FOR JAMF TRUST PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
 	if [ -e /Library/Managed\ Preferences/com.jamf.trust.plist ]; then cp "/Library/Managed Preferences/com.jamf.trust.plist" "$security/com.jamf.trust.plist" | plutil -convert xml1 "$security/com.jamf.trust.plist"
 	else
-		echo "Jamf Trust plist not found" >> $results
+		echo -e "Jamf Trust plist not found\n" >> $results
 	fi
 elif [[ "$Jamf_Protect" == FALSE ]];then
-	echo "Jamf Security log collection turned off" >> $results
+	echo -e "Jamf Security log collection turned off\n" >> $results
 else
-	echo "Jamf Security log collection variable set to invalid value"
+	echo -e "Jamf Security log collection variable set to invalid value\n" >> $results
 fi
 
 #MANAGED PREFERENCES PLIST COLLECTION
@@ -235,8 +239,9 @@ if [[ "$Managed_Preferences_Folder" == TRUE ]];then
 	mkdir -p $log_folder/Managed_Preferences
 	#CHECK FOR MANAGED PREFERENCE PLISTS, THEN COPY AND CONVERT THEM TO A READABLE FORMAT
 	if [ -e /Library/Managed\ Preferences/ ]; then cp /Library/Managed\ Preferences/*.plist $managed_preferences
+		echo -e "The Managed Preferences folder deploy plists that tell the referenced application what parameters to follow. If you deployed settings to an application that aren't applying, make sure the preference domain plist is deployed to this folder.\nCheck the Managed_Preferences output for results.\n" >> $results
 	else
-		echo "No Managed Preferences plist files found" >> $results
+		echo -e "No Managed Preferences plist files found\n" >> $results
 	fi
 	#SLEEP TO ALLOW COPY TO FINISH PROCESSING ALL FILES
 	sleep 5
@@ -245,7 +250,7 @@ if [[ "$Managed_Preferences_Folder" == TRUE ]];then
 	#IF THIS SECTION IS NOT WORKING, FIND A COMMON PLIST THAT IS DEPLOYED FLEET WIDE LIKE A NOTIFICATION PAYLOAD OR SYSTEM EXTENSIONS AND CHANGE IT IN THE NEXT LINE
 	if [ -e $managed_preferences/com.apple.TCC.configuration-profile-policy.plist ]; then plutil -convert xml1 $HOME/Desktop/Logs/managed_preferences/*.plist
 	else
-		echo "No files to convert to plist" >> $results
+		echo -e "No files to convert to plist\n" >> $results
 	fi
 	#LIST ALL INSTALLED USER AND MACHINE PROFILES AND SAVE TO A .TXT FILE
 	profiles show > $log_folder/User_Installed_Profiles.txt
@@ -254,18 +259,18 @@ if [[ "$Managed_Preferences_Folder" == TRUE ]];then
 	# sudo profiles show > $log_folder/User_Installed_Profiles.txt
 	
 elif [[ "$Managed_Preferences_Folder" == FALSE ]];then
-	echo "Managed Preferences collection turned off" >> $results
+	echo -e "Managed Preferences collection turned off\n" >> $results
 else
-	echo "Managed Preferences collection variable set to invalid value"
+	echo -e "Managed Preferences collection variable set to invalid value\n"
 fi
 
 #CLEANS OUT EMPTY FOLDERS TO AVOID CONFUSION
 for emptyfolder in $cleanup
 do	
 if [ -z "$(ls -A /$log_folder/$emptyfolder)" ]; then
-	echo "$emptyfolder is Empty removing folder" >>$results | rm -r $log_folder/$emptyfolder
+	echo -e "$emptyfolder folder is empty, removing folder\n" >>$results | rm -r $log_folder/$emptyfolder
 else
-	echo "$emptyfolder is Not Empty leaving folder" >>$results
+	echo -e "$emptyfolder folder is not empty, leaving folder\n" >>$results
 fi
 done
 			
@@ -275,18 +280,19 @@ buttonClicked2=$(/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/
 				
 if [ $buttonClicked2 == 0 ]; then
 #USER RECEIVED THE CONFIRMATION HELPER THAT SCRIPT COMPLETED
-echo "Script completed at $currenttime" > $results
+echo -e "Script completed at $currenttime\n" >> $results
 else
-echo "Jamf Helper did not notify user that log collection was complete" > $results
+echo -e "Jamf Helper did not notify user that log collection was complete\n" >> $results
 fi
 elif [[ $Finish_Notification == FALSE ]]; then
-	echo "Finish Notification turned off"
+	echo -e "Finish Notification turned off\n" >> $results
+	
 else
-	echo "Finish Notification set to invalid value"
+	echo -e "Finish Notification set to invalid value\n" >> $results
 fi
 
 #STAMP TIME COMPLETED BEFORE ZIPPING FILES
-echo "Completed Log Grabber on '$currenttime'" >> $results
+echo -e "Completed Log Grabber on '$currenttime'\n" >> $results
 
 #ZIP IT ALL UP FOR ATTACHMENT TO AN EMAIL
 
@@ -297,7 +303,7 @@ cd $HOME/Desktop
 zip $HOME/Desktop/"$loggedInUser"_logs_collected_"$currentlogdate".zip -r Logs
 rm -r $log_folder
 elif [[ "$ZIP_Folder" == FALSE ]];then
-	echo "Zip Folder turned off, leaving logs folder"
+	echo -e "Zip Folder turned off, leaving logs folder as is\n" >> $results
 else
-	echo "Zip Folder set to invalid value"
+	echo -e "Zip Folder set to invalid value\n" >> $results
 fi
