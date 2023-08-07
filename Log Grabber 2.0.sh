@@ -8,11 +8,12 @@
 JSS_LOGS=FALSE
 Recon_Troubleshoot=TRUE
 Jamf_Self_Service=FALSE
-Jamf_Connect=FALSe
+Jamf_Connect=FALSE
 Jamf_Protect=FALSE
 Managed_Preferences_Folder=FALSE
 Start_Notification=FALSE
 Finish_Notification=FALSE
+ZIP_Folder=TRUE
 
 #If Start_Notification is set to 'TRUE' use this to CUSTOMIZE YOUR START NOTIFICATION FROM JAMF HELPER BY EDITING THE QUOTED ITEMS OF EACH VARIABLE
 Start_Notification_Title=$(echo "Support Desk Notification")
@@ -290,9 +291,13 @@ echo "Completed Log Grabber on '$currenttime'" >> $results
 #ZIP IT ALL UP FOR ATTACHMENT TO AN EMAIL
 
 #SET WORKING DIRECTORY TO DESKTOP
+if [[ "$ZIP_Folder" == TRUE ]];then
 cd $HOME/Desktop
-
 #NAME ZIPPED FOLDER WITH LOGGED IN USER AND TIME
 zip $HOME/Desktop/"$loggedInUser"_logs_collected_"$currentlogdate".zip -r Logs
-
 rm -r $log_folder
+elif [[ "$ZIP_Folder" == FALSE ]];then
+	echo "Zip Folder turned off, leaving logs folder"
+else
+	echo "Zip Folder set to invalid value"
+fi
