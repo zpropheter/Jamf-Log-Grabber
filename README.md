@@ -2,7 +2,7 @@
 
 This script is designed to be a customizable log gathering script for troubleshooting.
 
-**Not to be used with /attachments endpoint via Jamf API**
+### **Not to be used with /attachments endpoint via Jamf API**
 
 It runs quickly in the background and does uses very few resources, however you can toggle User notification on or off if you're concerned about interrupting sensitive work with it running in the background.
 
