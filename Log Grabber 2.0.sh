@@ -34,7 +34,7 @@ Jamf_Protect=TRUE
 Managed_Preferences_Folder=TRUE
 Start_Notification=FALSE
 Finish_Notification=FALSE
-ZIP_Folder=FALSE
+ZIP_Folder=TRUE
 
 #If Start_Notification is set to 'TRUE' use this to CUSTOMIZE YOUR START NOTIFICATION FROM JAMF HELPER BY EDITING THE QUOTED ITEMS OF EACH VARIABLE
 Start_Notification_Title=$(echo "Support Desk Notification")
@@ -149,7 +149,9 @@ if [[ "$Recon_Troubleshoot" == TRUE ]];then
 	else
 		echo $reconleftovers > $recon/Leftovers.txt
 		#DIAGNOSTIC INFORMATION FOR RECON RESULTS. FOLLOWING THESE STEPS WILL HELP IDENTIFY PROBLEMATIC EXTENSION ATTRIBUTES AND/OR INVENTORY CHECK IN PROBLEMS
-		echo -e "\nRecon leftovers found and listed above\nTo remediate, take the following steps:\n1. Open Terminal\n2.Type 'rm -r /Library/Application\ Support/JAMF/tmp/*'\nThis will remove all temporary files in the folder and allow the inventory update to complete.\nSometimes these files get stuck, so this helps reset them.\nIf the files come back:\n1. Run a 'cat /Library/Application\ Support/JAMF/tmp/temporaryfilename'\n2. Find the extension attribute that matches the output from the command and disable or delete it until the root cause is identified\n" >> $recon/Leftovers.txt
+		echo -e "\nRecon leftovers found and listed above\nTo remediate, take the following steps:\n1. Open Terminal\n2.Type 'rm -r /Library/Application\ Support/JAMF/tmp/*'\nThis will remove all temporary files in the folder and allow the inventory update to complete.\nSometimes these files get stuck, so this helps reset them.\nIf the files come back:\n1\n1. Run a 'cat /Library/Application\ Support/JAMF/tmp/temporaryfilename'\n2. Find the extension attribute that matches the output from the command and disable or delete it until the root cause is identified\n" >> $recon/Leftovers.txt
+		#REPORT IN RESULTS FILE THAT LEFTOVERS WERE FOUND
+		echo -e "\nRecon Troubleshoot found files in the /tmp directory that should not be there. A report of these files as well as next actions can be found in the Leftovers.txt file in the Recon Directory.\n" >> $results
 	fi
 elif [[ "$Recon_Troubleshoot" == FALSE ]];then
 	echo -e "Recon Troubleshoot turned off\n" >> $results
@@ -225,7 +227,7 @@ fi);else
 	#LIST AUTHCHANGER SETTIGNS
 	if [ -e /usr/local/bin/authchanger ]; then
 		/usr/local/bin/authchanger -print > "$connect/authchanger_manuallyCollected.txt"
-		echo -e "Authchanger changes the authentication database for MacOS.\nMore info can be found at this URL:\nhttps://learn.jamf.com/bundle/jamf-connect-documentation-current/page/authchanger.html\nReview the authchanger_manuallyCollected.txt file to see your settings and determine if Authchanger needs to be modified for your environment." >> $results;else
+		echo -e "Authchanger changes the authentication database for MacOS.\nMore info can be found at this URL:\nhttps://learn.jamf.com/bundle/jamf-connect-documentation-current/page/authchanger.html\nReview the authchanger_manuallyCollected.txt file to see your settings and determine if Authchanger needs to be modified for your environment.\n" >> $results;else
 			echo -e "No Authchanger settings found\n" >> $results
 		fi
 elif [[ "$Jamf_Connect" == FALSE ]];then
@@ -243,7 +245,6 @@ if [[ "$Jamf_Protect" == TRUE ]];then
 	else
 		echo -e "Jamf Protect plist not found\n" >> $results
 	fi
-	
 	#CHECK FOR JAMF TRUST PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
 	if [ -e /Library/Managed\ Preferences/com.jamf.trust.plist ]; then cp "/Library/Managed Preferences/com.jamf.trust.plist" "$security/com.jamf.trust.plist" | plutil -convert xml1 "$security/com.jamf.trust.plist"
 	else
