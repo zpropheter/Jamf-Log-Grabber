@@ -26,15 +26,15 @@
 
 
 #VARIABLES MUST BE SET TO 'TRUE' OR 'FALSE' AND ARE CASE SENSITIVE
-JSS_LOGS=TRUE
-Recon_Troubleshoot=TRUE
-Jamf_Self_Service=TRUE
+JSS_LOGS=FALSE
+Recon_Troubleshoot=FALSE
+Jamf_Self_Service=FALSE
 Jamf_Connect=TRUE
-Jamf_Protect=TRUE
-Managed_Preferences_Folder=TRUE
+Jamf_Protect=FALSE
+Managed_Preferences_Folder=FALSE
 Start_Notification=FALSE
 Finish_Notification=FALSE
-ZIP_Folder=TRUE
+ZIP_Folder=FALSE
 
 #If Start_Notification is set to 'TRUE' use this to CUSTOMIZE YOUR START NOTIFICATION FROM JAMF HELPER BY EDITING THE QUOTED ITEMS OF EACH VARIABLE
 Start_Notification_Title=$(echo "Support Desk Notification")
@@ -108,7 +108,7 @@ if [[ "$JSS_LOGS" == TRUE ]];then
 	mkdir -p $log_folder/JSS
 	#FIND AND COPY THE JAMF SOFTWARE PLIST THEN CONVERT IT TO A READABLE FORMAT.
 	#COPY DEBUG LOG
-	if [ -e /Library/Preferences/com.jamfsoftware.jamf.plist ]; then cp "/Library/Preferences/com.jamfsoftware.jamf.plist" "$JSS/com.jamfsoftware.jamf.plist" | plutil -convert xml1 "$JSS/com.jamfsoftware.jamf.plist" | log show --style compact --predicate 'subsystem == "com.jamfsoftware.jamf"' --debug > "$JSS/Jamfsoftware.log"
+	if [ -e /Users/$loggedInUser/Library/Preferences/com.jamfsoftware.jamf.plist ]; then cp "/Library/Preferences/com.jamfsoftware.jamf.plist" "$JSS/com.jamfsoftware.jamf.plist" | plutil -convert xml1 "$JSS/com.jamfsoftware.jamf.plist" | log show --style compact --predicate 'subsystem == "com.jamfsoftware.jamf"' --debug > "$JSS/Jamfsoftware.log"
 	else
 		echo -e "Jamf Software plist not found\n" >> $results
 	fi
@@ -134,10 +134,39 @@ if [[ "$JSS_LOGS" == TRUE ]];then
 	else
 		echo -e "Jamf Connect Login plist not found\n" >> $results
 	fi
+	#THIS SECTION IS UNLIKELY TO WORK IF THE MDM IS NOT COMMUNICATING WITH THE DEVICE.
+	#IT WILL STILL GET GOOD INFORMATION IF MDM IS COMMUNICATING
+	#IF A DEVICE IS NOT COMMUNICATING WITH MDM, THIS WILL ALSO GIVE ITEMS TO LOOK INTO
+	#WRITE TO LOGS WHAT WE ARE DOING NEXT
+	echo -e "Checking $loggedInUser's computer for MDM communication issues:" >> $results
+	#CHECK MDM STATUS AND ADVISE IF IT IS COMMUNICATING
+	result=$(log show --style compact --predicate '(process CONTAINS "mdmclient")' --last 1d | grep "Unable to create MDM identity")
+	if [[ $result == '' ]]; then
+			echo -e "-MDM is communicating" >> $results
+		else
+			echo -e "-MDM is broken" >> $results
+		fi
+	#CHECK FOR THE MDM PROFILE TO BE INSTALLED
+	mdmProfile=$(/usr/libexec/mdmclient QueryInstalledProfiles | grep "00000000-0000-0000-A000-4A414D460003")
+	if [[ $mdmProfile == "" ]]; then
+		echo -e "-MDM Profile Not Installed" >> $results
+	else
+		echo -e "-MDM Profile Installed" >> $results
+	fi
+	#TELL THE STATUS OF THE MDM DAEMON
+	mdmDaemonStatus=$(/System/Library/PrivateFrameworks/ApplePushService.framework/apsctl status | grep -A 18 com.apple.aps.mdmclient.daemon.push.production | awk -F':' '/persistent connection status/ {print $NF}' | sed 's/^ *//g')
+	echo -e "-The MDM Daemon Status is:$mdmDaemonStatus" >> $results
+	#WRITE THE APNS TOPIC TO THE RESULTS FILE IF IT EXISTS
+	profileTopic=$(system_profiler SPConfigurationProfileDataType | grep "Topic" | awk -F '"' '{ print $2 }');
+	if [ "$profileTopic" != "" ]; then
+		echo -e "-APNS Topic is: $profileTopic\n" >> $results
+	else
+		echo -e "-No APNS Topic Found\n" >> $results
+	fi
 elif [[ "$JSS_LOGS" == FALSE ]];then
-		echo -e "JSS Log Collection turned off\n" >> $results
+		echo -e "JSS Log Collection turned off" >> $results
 else
-	echo -e "JSS Log Collection variable set to invalid value\n" >>$results
+	echo -e "JSS Log Collection variable set to invalid value" >>$results
 fi
 
 #JAMF RECON TROUBLESHOOTING
@@ -175,6 +204,7 @@ fi
 
 #JAMF CONNECT LOG COLLECTION
 if [[ "$Jamf_Connect" == TRUE ]];then
+	echo "Collecting Jamf Connect logs..." >>$results
 	mkdir -p $log_folder/Connect
 	#create a log file for script and save to Logs directory so users can see what logs were not gathered
 	touch $results	
@@ -185,20 +215,20 @@ if [[ "$Jamf_Connect" == TRUE ]];then
 		log show --style compact --predicate 'subsystem == "com.jamf.connect.login"' --debug > $connect/jamfconnect.login.log
 		kerberioscheck=$(kerblist=$("klist" 2>/dev/null)
 	if [[ "$kerblist" == "" ]];then
-		echo "No Kerberos Ticket for Current Logged in User" > $connect/klist_manuallyCollected.txt; else
+		echo "-No Kerberos Ticket for Current Logged in User" > $connect/klist_manuallyCollected.txt; else
 			echo $kerblist > $connect/klist_manuallyCollected.txt
 fi);else
-	echo -e "No Jamf Connect Installed, doing nothing\n" >> $results
+	echo -e "-No Jamf Connect Installed, doing nothing\n" >> $results
 	fi
 	#CHECK FOR JAMF CONNECT LOGIN LOGS AND PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
 	if [ -e /tmp/jamf_login.log ]; then cp "/tmp/jamf_login.log" $connect/jamf_login_tmp.log
 	else
-		echo -e "Jamf Login /tmp file not found\nThis usually only exists on recent installs.\nDon't worry if you don't see anything. We're just being thorough.\n" >> $results
+		echo -e "-Jamf Login /tmp file not found\n-This usually only exists on recent installs.\n-Don't worry if you don't see anything. We're just being thorough.\n" >> $results
 	fi
 	
 	if [ -e /Library/Managed\ Preferences/com.jamf.connect.login.plist ]; then cp "/Library/Managed Preferences/com.jamf.connect.login.plist" "$connect/com.jamf.connect.login_managed.plist" | plutil -convert xml1 "$connect/com.jamf.connect.login_managed.plist" | log show --style compact --predicate 'subsystem == "com.jamf.connect.login"' --debug > "$connect/com.jamf.connect.login.log"
 	else
-		echo -e "Jamf Connect Login plist not found\n" >> $results
+		echo -e "-Jamf Connect Login plist not found\n" >> $results
 	fi
 	
 	#CHECK FOR JAMF CONNECT LICENSE, THEN COPY AND CONVERT TO A READABLE FORMAT
@@ -213,9 +243,10 @@ fi);else
 	fi
 	
 	#CHECK FOR JAMF CONNECT STATE PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
-	State_plist=$(defaults read com.jamf.connect.state.plist 2>/dev/null)
+	State_plist=$(defaults read /Users/$loggedInUser/Library/Preferences/com.jamf.connect.state.plist 2>/dev/null)
 	if [[ "$State_plist" == "" ]]; then
-		echo -e "A Jamf Connect State list was not found because no user is logged into Menu Bar\n" >> $results; else cp $HOME/Library/Preferences/com.jamf.connect.state.plist "$connect/com.jamf.connect.state.plist" | plutil -convert xml1 $connect/com.jamf.connect.state.plist
+		echo -e "-A Jamf Connect State list was not found because no user is logged into Menu Bar\n" >> $results; 
+	else cp $HOME/Library/Preferences/com.jamf.connect.state.plist "$connect/com.jamf.connect.state.plist" | plutil -convert xml1 $connect/com.jamf.connect.state.plist
 		fi
 	
 	#CHECK FOR JAMF CONNECT MENU BAR PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
@@ -227,8 +258,9 @@ fi);else
 	#LIST AUTHCHANGER SETTIGNS
 	if [ -e /usr/local/bin/authchanger ]; then
 		/usr/local/bin/authchanger -print > "$connect/authchanger_manuallyCollected.txt"
-		echo -e "Authchanger changes the authentication database for MacOS.\nMore info can be found at this URL:\nhttps://learn.jamf.com/bundle/jamf-connect-documentation-current/page/authchanger.html\nReview the authchanger_manuallyCollected.txt file to see your settings and determine if Authchanger needs to be modified for your environment.\n" >> $results;else
-			echo -e "No Authchanger settings found\n" >> $results
+		echo -e "-Authchanger changes the authentication database for MacOS.\nMore info can be found at this URL:\nhttps://learn.jamf.com/bundle/jamf-connect-documentation-current/page/authchanger.html\nReview the authchanger_manuallyCollected.txt file to see your settings and determine if Authchanger needs to be modified for your environment.\n" >> $results;
+	else
+			echo -e "-No Authchanger settings found\n" >> $results
 		fi
 elif [[ "$Jamf_Connect" == FALSE ]];then
 echo -e "Jamf Connect log collection turned off\n" >> $results
@@ -261,7 +293,7 @@ if [[ "$Managed_Preferences_Folder" == TRUE ]];then
 	mkdir -p $log_folder/Managed_Preferences
 	#CHECK FOR MANAGED PREFERENCE PLISTS, THEN COPY AND CONVERT THEM TO A READABLE FORMAT
 	if [ -e /Library/Managed\ Preferences/ ]; then cp /Library/Managed\ Preferences/*.plist $managed_preferences
-		echo -e "The Managed Preferences folder deploy plists that tell the referenced application what parameters to follow. If you deployed settings to an application that aren't applying, make sure the preference domain plist is deployed to this folder.\nCheck the Managed_Preferences output for results.\n" >> $results
+		echo -e "The Managed Preferences folder deploys plists that tell the referenced application what parameters to follow. If you deployed settings to an application that aren't applying, make sure the preference domain plist is deployed to this folder.Check the Managed_Preferences output for results.\n" >> $results
 	else
 		echo -e "No Managed Preferences plist files found\n" >> $results
 	fi
@@ -283,18 +315,20 @@ if [[ "$Managed_Preferences_Folder" == TRUE ]];then
 elif [[ "$Managed_Preferences_Folder" == FALSE ]];then
 	echo -e "Managed Preferences collection turned off\n" >> $results
 else
-	echo -e "Managed Preferences collection variable set to invalid value\n"
+	echo -e "Managed Preferences collection variable set to invalid value\n" >> $results
 fi
 
 #CLEANS OUT EMPTY FOLDERS TO AVOID CONFUSION
+echo -e "Cleaning out empty folders from the directory...." >> $results
 for emptyfolder in $cleanup
 do	
 if [ -z "$(ls -A /$log_folder/$emptyfolder)" ]; then
-	echo -e "$emptyfolder folder is empty, removing folder\n" >>$results | rm -r $log_folder/$emptyfolder
+	echo -e "-$emptyfolder folder is empty, removing folder" >>$results | rm -r $log_folder/$emptyfolder
 else
-	echo -e "$emptyfolder folder is not empty, leaving folder\n" >>$results
+	echo -e "-$emptyfolder folder is not empty, leaving folder" >>$results
 fi
 done
+echo -e "-Finished cleaning up.\n" >> $results
 			
 if [[ "$Finish_Notification" == TRUE ]];then
 #BUILD A JAMF HELPER TO NOTIFY USERS THAT LOG COLLECTION IS COMPLETED
@@ -325,7 +359,7 @@ cd $HOME/Desktop
 zip $HOME/Desktop/"$loggedInUser"_logs_collected_"$currentlogdate".zip -r Logs
 rm -r $log_folder
 elif [[ "$ZIP_Folder" == FALSE ]];then
-	echo -e "Zip Folder turned off, leaving logs folder as is\n" >> $results
+	echo -e "Zip Folder turned off, leaving logs folder on the user's desktop" >> $results
 else
-	echo -e "Zip Folder set to invalid value\n" >> $results
+	echo -e "Zip Folder set to invalid value" >> $results
 fi
