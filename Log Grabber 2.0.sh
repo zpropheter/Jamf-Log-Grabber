@@ -24,14 +24,18 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#INSTEAD OF MANUALLY SETTING THE COLLECTION VARIABLES, CREATE A MODE THAT LOG GRABBER WILL OPERATE IN
+#OPTIONS= JAMF, JAMFZIP, ALL, ALLZIP
+#Set to Jamf custom script variable to be able to change on the fly if deploying via policy
+log_mode="$4"
 
 #VARIABLES MUST BE SET TO 'TRUE' OR 'FALSE' AND ARE CASE SENSITIVE
-JSS_LOGS=FALSE
-Recon_Troubleshoot=FALSE
-Jamf_Self_Service=FALSE
+JSS_LOGS=TRUE
+Recon_Troubleshoot=TRUE
+Jamf_Self_Service=TRUE
 Jamf_Connect=TRUE
-Jamf_Protect=FALSE
-Managed_Preferences_Folder=FALSE
+Jamf_Protect=TRUE
+Managed_Preferences_Folder=TRUE
 Start_Notification=FALSE
 Finish_Notification=FALSE
 ZIP_Folder=FALSE
@@ -102,6 +106,46 @@ touch $results
 
 #SET A TIME AND DATE STAMP FOR WHEN THE LOG GRABBER WAS RAN
 echo -e "Log Grabber was started at '$currenttime'\n" >> $results
+
+if [[ $log_mode == JAMF ]]; then
+	echo "Jamf only mode enabled" >> $results
+	JSS_LOGS=TRUE
+	Recon_Troubleshoot=TRUE
+	Jamf_Self_Service=TRUE
+	Jamf_Connect=TRUE
+	Jamf_Protect=TRUE
+	Managed_Preferences_Folder=FALSE
+	ZIP_Folder=FALSE
+elif [[ $log_mode == JAMFZIP ]]; then
+	echo "Jamf only zip mode enabled" >> $results
+	JSS_LOGS=TRUE
+	Recon_Troubleshoot=TRUE
+	Jamf_Self_Service=TRUE
+	Jamf_Connect=TRUE
+	Jamf_Protect=TRUE
+	Managed_Preferences_Folder=FALSE
+	ZIP_Folder=TRUE
+elif [[ $log_mode == ALL ]]; then
+	echo "Collect ALL logs mode enabled" >> $results
+	JSS_LOGS=TRUE
+	Recon_Troubleshoot=TRUE
+	Jamf_Self_Service=TRUE
+	Jamf_Connect=TRUE
+	Jamf_Protect=TRUE
+	Managed_Preferences_Folder=TRUE
+	ZIP_Folder=FALSE
+elif [[ $log_mode == ALLZIP ]]; then
+	echo "Collect ALL logs and ZIP mode enabled" >> $results
+	JSS_LOGS=TRUE
+	Recon_Troubleshoot=TRUE
+	Jamf_Self_Service=TRUE
+	Jamf_Connect=TRUE
+	Jamf_Protect=TRUE
+	Managed_Preferences_Folder=TRUE
+	ZIP_Folder=FALSE
+else
+	echo "Log Mode not turned on or set to incorrect variable, will use manual settings" >> $results
+fi 
 
 #LOG COLLECTION FOR JAMF BINARY
 if [[ "$JSS_LOGS" == TRUE ]];then
