@@ -38,7 +38,7 @@ Jamf_Protect=TRUE
 Managed_Preferences_Folder=TRUE
 Start_Notification=FALSE
 Finish_Notification=FALSE
-ZIP_Folder=FALSE
+ZIP_Folder=TRUE
 
 #If Start_Notification is set to 'TRUE' use this to CUSTOMIZE YOUR START NOTIFICATION FROM JAMF HELPER BY EDITING THE QUOTED ITEMS OF EACH VARIABLE
 Start_Notification_Title=$(echo "Support Desk Notification")
