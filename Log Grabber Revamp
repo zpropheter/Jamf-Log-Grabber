@@ -40,8 +40,9 @@ connect=$log_folder/Connect
 managed_preferences=$log_folder/Managed_Preferences
 recon=$log_folder/Recon
 self_service=$log_folder/Self_Service
+Device_Compliance=$log_folder/Device_Compliance
 loggedInUser=$( echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }' )
-reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/)
+reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
 
 #DATE FOR LOG FOLDER ZIP CREATION
 currentlogdate=$(date)
@@ -49,8 +50,20 @@ currentlogdate=$(date)
 #DATE AND TIME FOR RESULTS.TXT INFORMATION
 currenttime=$(date +"%D %T")
 
-#IF A VARIABLE ABOVE IS SET TO 'FALSE', REMOVE THE FOLDER NAME FOR IT BELOW TO AVOID ERRORS WITH THE CLEANUP FUNCTION AT THE END OF THE SCRIPT
-cleanup=("JSS Recon Self_Service Connect Jamf_Security Managed_Preferences")
+####################################################################################################
+# You can add custom app log grabbing using the following rubric, just continue numbering the appnames or renaming them to fit your needs
+#DEPNotify filled in for demonstration purposes
+CustomApp1Name=DEPNotify
+CustomApp1Folder=$log_folder/$CustomApp1Name
+#Now go down to CustomApp1Array and put in the files you want to grab
+CustomApp2Name=
+CustomApp2Folder=$log_folder/$CustomApp2Name
+#Now go down to CustomApp2Array and put in the files you want to grab
+CustomApp3Name=
+CustomApp3Folder=$log_folder/$CustomApp3Name
+#Now go down to CustomApp2Array and put in the files you want to grab
+
+
 
 ####################################################################################################
 #Array for Jamf Logs
@@ -245,11 +258,61 @@ Managed_Preferences_Array() {
 	# sudo profiles show > $log_folder/User_Installed_Profiles.txt
 }
 
+####################################################################################################
+#Array for Device Compliance
+DeviceCompliance() {
+	mkdir -p $log_folder/Device_Compliance
+	if [ -e /Library/Logs/Microsoft/Intune/ ]; then cp /Library/Logs/Microsoft/Intune/*.log $Device_Compliance
+	else
+		echo -e "Device Compliance system logs not found.\n" >> $results
+	fi
+	if [ -e /$loggedInUser/Logs/Microsoft/Intune/ ]; then cp /Library/Logs/Microsoft/Intune/*.log $Device_Compliance
+	else
+		echo -e "Device Compliance user logs not found.\n" >> $results
+	fi
+	
+}
+
+####################################################################################################
+#Array for App Named in Dynamic Variables
+#When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
+CustomApp1Array() {
+	mkdir -p $log_folder/$CustomApp1Name
+	if [ -e /var/tmp/depnotify.log ]; then cp /var/tmp/depnotify.log $CustomApp1Folder
+	else
+		echo -e "$CustomApp1Name does not have a log file available to grab.\n" >> $results
+	fi
+}
+
+####################################################################################################
+#Array for App Named in Dynamic Variables
+#When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
+CustomApp2Array() {
+	mkdir -p $log_folder/$CustomApp2Name
+	if [ -e /var/tmp/depnotify.log ]; then cp /var/tmp/depnotify.log $CustomApp2Folder
+	else
+		echo -e "$CustomApp2Name does not have a log file available to grab.\n" >> $results
+	fi
+}
+
+####################################################################################################
+#Array for App Named in Dynamic Variables
+#When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
+CustomApp3Array() {
+	mkdir -p $log_folder/$CustomApp3Name
+	if [ -e /var/tmp/depnotify.log ]; then cp /var/tmp/depnotify.log $CustomApp3Folder
+	else
+		echo -e "$CustomApp3Name does not have a log file available to grab.\n" >> $results
+	fi
+}
+
 
 ####################################################################################################
 
 #Array for folder cleanup
 Cleanup() {
+	#IF A VARIABLE ABOVE IS SET TO 'FALSE', REMOVE THE FOLDER NAME FOR IT BELOW TO AVOID ERRORS WITH THE CLEANUP FUNCTION AT THE END OF THE SCRIPT
+	cleanup=("JSS Recon Self_Service Connect Jamf_Security Managed_Preferences Device_Compliance $CustomApp1Name $CustomApp2Name $CustomApp3Name")
 	#CLEANS OUT EMPTY FOLDERS TO AVOID CONFUSION
 	echo -e "Cleaning out empty folders from the directory...." >> $results
 	for emptyfolder in $cleanup
@@ -276,9 +339,10 @@ Zip_Folder() {
 ####################################################################################################
 ####################################################################################################
 ####################################################################################################
-# Set the Arrays you want to grab
+# Set the Arrays you want to grab.
+# Default Array is logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences")
 	
-declare -a logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences")
+declare -a logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
 ####################################################################################################
 ####################################################################################################
@@ -318,15 +382,32 @@ logGrabberMasterArray() {
 			Managed_Preferences)
 				Managed_Preferences_Array 
 			;;
+			Device_Compliance)
+				DeviceCompliance 
+			;;
+			"$CustomApp1Name")
+				#Add or Remove comment from line below to disable or enable the array for the custom app
+				CustomApp1Array  
+			;;
+			"$CustomApp2Name")
+				#Add or Remove comment from line below to disable or enable the array for the custom app
+				#CustomApp2Array  
+			;;
+			"$CustomApp3Name")
+				#Add or Remove comment from line below to disable or enable the array for the custom app
+				#CustomApp3Array  
+			;;
 			*)
 				echo "$logs is an invalid variable for the array. Check your spelling or add it to the case argument with your own array" >> $results
 			;;
 		esac
 	done
-	Cleanup 
+
 }
 
 #Runs the Log Grabber as configured
 logGrabberMasterArray 
+#Run cleanup Array to remove empty folders
+Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
 Zip_Folder 
