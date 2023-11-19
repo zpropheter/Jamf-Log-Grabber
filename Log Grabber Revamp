@@ -51,9 +51,9 @@ currentlogdate=$(date)
 currenttime=$(date +"%D %T")
 
 ####################################################################################################
-# You can add custom app log grabbing using the following rubric, just continue numbering the appnames or renaming them to fit your needs
-#DEPNotify filled in for demonstration purposes
-#You only need to edit the CustomApp#Name line, the rest is taken care of by the script.
+#You can add custom app log grabbing using the following rubric, just continue numbering the appnames or renaming them to fit your needs
+#You can pass jamf script variables as part of a policy to get your additional apps
+
 CustomApp1Name="$4"
 CustomApp1Folder=$log_folder/$CustomApp1Name
 CustomApp1LogSource="$5"
@@ -346,7 +346,7 @@ Zip_Folder() {
 # Set the Arrays you want to grab.
 # Default Array is logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance")
 	
-declare -a logsToGrab=("$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+declare -a logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
 ####################################################################################################
 ####################################################################################################
