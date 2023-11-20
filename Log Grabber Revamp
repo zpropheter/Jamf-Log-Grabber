@@ -203,6 +203,11 @@ Recon_Troubleshoot() {
 		echo -e "\nRecon leftovers found and listed above\nTo remediate, take the following steps:\n1. Open Terminal\n2.Type 'rm -r /Library/Application\ Support/JAMF/tmp/*'\nThis will remove all temporary files in the folder and allow the inventory update to complete.\nSometimes these files get stuck, so this helps reset them.\nIf the files come back:\n1\n1. Run a 'cat /Library/Application\ Support/JAMF/tmp/temporaryfilename'\n2. Find the extension attribute that matches the output from the command and disable or delete it until the root cause is identified\n" >> $recon/Leftovers.txt
 		#REPORT IN RESULTS FILE THAT LEFTOVERS WERE FOUND
 		echo -e "\nRecon Troubleshoot found files in the /tmp directory that should not be there. A report of these files as well as next actions can be found in the Leftovers.txt file in the Recon Directory.\n" >> $results
+		#for loop that runs a cat on the files found by $reconleftovers
+		for badExtensionAttributes in $reconleftovers
+		do touch $recon/$badExtensionAttributes
+			cat /Library/Application\ Support/Jamf/tmp/$badExtensionAttributes >> $recon/Fix_This_EA_$badExtensionAttributes
+		done
 	fi
 }
 ####################################################################################################
@@ -343,9 +348,9 @@ Zip_Folder() {
 }
 ####################################################################################################
 # Set the Arrays you want to grab.
-# Default Array is logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance")
-	
-declare -a logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+# Default Array is logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+
+declare -a logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
 ####################################################################################################
 # Put it all together in the Master Array
@@ -403,12 +408,12 @@ logGrabberMasterArray() {
 			;;
 		esac
 	done
-
+	
 }
 
 #Runs the Log Grabber as configured
 logGrabberMasterArray 
 #Run cleanup Array to remove empty folders
-#Cleanup
+Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
-#Zip_Folder 
+Zip_Folder 
