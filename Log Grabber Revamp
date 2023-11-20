@@ -200,7 +200,7 @@ Recon_Troubleshoot() {
 	else
 		echo $reconleftovers > $recon/Leftovers.txt
 		#DIAGNOSTIC INFORMATION FOR RECON RESULTS. FOLLOWING THESE STEPS WILL HELP IDENTIFY PROBLEMATIC EXTENSION ATTRIBUTES AND/OR INVENTORY CHECK IN PROBLEMS
-		echo -e "\nRecon leftovers found and listed above\nTo remediate, take the following steps:\n1. Open Terminal\n2.Type 'rm -r /Library/Application\ Support/JAMF/tmp/*'\nThis will remove all temporary files in the folder and allow the inventory update to complete.\nSometimes these files get stuck, so this helps reset them.\nIf the files come back:\n1\n1. Run a 'cat /Library/Application\ Support/JAMF/tmp/temporaryfilename'\n2. Find the extension attribute that matches the output from the command and disable or delete it until the root cause is identified\n" >> $recon/Leftovers.txt
+		echo -e "\nRecon leftovers found and listed above\nTo remediate, take the following steps:\n1. Open Terminal\n2.Type 'rm -r /Library/Application\ Support/JAMF/tmp/*'\nThis will remove all temporary files in the folder and allow the inventory update to complete.\nSometimes these files get stuck, so this helps reset them.\nIf the files come back:\n\n1. Run a 'cat /Library/Application\ Support/JAMF/tmp/temporaryfilename'\n2. Find the extension attribute that matches the output from the command and disable or delete it until the root cause is identified\n" >> $recon/Leftovers.txt
 		#REPORT IN RESULTS FILE THAT LEFTOVERS WERE FOUND
 		echo -e "\nRecon Troubleshoot found files in the /tmp directory that should not be there. A report of these files as well as next actions can be found in the Leftovers.txt file in the Recon Directory.\n" >> $results
 		#for loop that runs a cat on the files found by $reconleftovers
