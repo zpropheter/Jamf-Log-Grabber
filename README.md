@@ -6,7 +6,7 @@
 Jamf Log Grabber is a bash based script that can be deployed manually, via Jamf MDM Policy, or as a Self Service Tool.
 
 Here's everything you'll be able to see
-- Jamf Binary Related Logs: com.jamfsoftware.jamf.plist, Jamf.Log, Install.Log, System.logs
+- Jamf Binary Related Logs and plists: com.jamfsoftware.jamf.plist, Jamf.Log, Install.Log, System.logs
 - Jamf Connect Logs and Plists
 - Jamf Protect Plists
 - MDM Communication Statuses
