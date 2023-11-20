@@ -1,19 +1,26 @@
-# Jamf-Log-Grabber
+# Jamf Log Grabber
+## _Get all the logs you'll ever need_
 
-This script is designed to be a customizable log gathering script for troubleshooting.
+<img src="https://i.imgur.com/tvEU3Lt.png" width="200" height="200" />
 
-### **Not to be used with /attachments endpoint via Jamf API**
+Jamf Log Grabber is a bash based script that can be deployed manually, via Jamf MDM Policy, or as a Self Service Tool.
 
-It runs quickly in the background and does uses very few resources, however you can toggle User notification on or off if you're concerned about interrupting sensitive work with it running in the background.
+Here's everything you'll be able to see
+- Jamf Binary Related Logs: com.jamfsoftware.jamf.plist, Jamf.Log, Install.Log, System.logs
+- Jamf Connect Logs and Plists
+- Jamf Protect Plists
+- MDM Communication Statuses
+- Recon Troubleshooting: Checks for files left behind during a Jamf Recon command and provides a file name for further investigation
+- Intune Logs for Device Compliance
+- 3 Custom apps to configure for your own log gathering
 
-Customizable items are listed below:
+## Features
 
-Lines 28-37 are TRUE/FALSE variables for what items you want to collect. If you turn one of these off, remove the correlating folder name in line 32 to reduce errors. If you fail to do this, there will be errors regarding a nonexistent folder when cleanup runs
+- Ready to deploy script with preset Jamf Pro Variables
+- Simplified Customization
+- Verbose results file for fast diagnostics
 
-Lines 39-44 are customizable variable for the Jamf Helper Start Notification. Edit the quoted text in the variable to change the Jamf Helper Window
+## Installation
 
-Lines 46-50 are customizable variable for the Jamf Helper Finish Notification. Edit the quoted text in the variable to change the Jamf Helper Window
+Download the latest copy of Jamf Log Grabber [here](https://github.com/zpropheter/Jamf-Log-Grabber/tree/main)
 
-This can be deployed as a Self Service Policy or as a standard policy. The main log folder is left on the user's desktop. If the file is zipped, it will stamp the username and date on the archive.
-
-Sudo permission is needed for the Recon Troubleshoot to work, everything else functions without sudo.
