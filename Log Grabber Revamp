@@ -54,9 +54,9 @@ currenttime=$(date +"%D %T")
 #You can add custom app log grabbing using the following rubric, just continue numbering the appnames or renaming them to fit your needs
 #You can pass jamf script variables as part of a policy to get your additional apps
 
-CustomApp1Name="$4"
+CustomApp1Name="DEPNotify"
 CustomApp1Folder=$log_folder/$CustomApp1Name
-CustomApp1LogSource="$5"
+CustomApp1LogSource="/var/tmp/depnotify.log"
 #Now go down to CustomApp1Array and put in the files you want to grab
 CustomApp2Name="$6"
 CustomApp2Folder=$log_folder/$CustomApp2Name
@@ -282,7 +282,7 @@ DeviceCompliance() {
 #When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
 CustomApp1Array() {
 	mkdir -p $log_folder/$CustomApp1Name
-	if [ -e $5 ]; then cp $CustomApp1LogSource $CustomApp1Folder
+	if [ -e $CustomApp1LogSource ]; then cp $CustomApp1LogSource $CustomApp1Folder
 	else
 		echo -e "$CustomApp1Name does not have a log file available to grab.\n" >> $results
 	fi
@@ -293,7 +293,7 @@ CustomApp1Array() {
 #When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
 CustomApp2Array() {
 	mkdir -p $log_folder/$CustomApp2Name
-	if [ -e $7 ]; then cp $CustomApp2LogSource $CustomApp2Folder
+	if [ -e $CustomApp2LogSource ]; then cp $CustomApp2LogSource $CustomApp2Folder
 	else
 		echo -e "$CustomApp2Name does not have a log file available to grab.\n" >> $results
 	fi
@@ -304,7 +304,7 @@ CustomApp2Array() {
 #When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
 CustomApp3Array() {
 	mkdir -p $log_folder/$CustomApp3Name
-	if [ -e $9 ]; then cp $CustomApp1LogSource $CustomApp3Folder
+	if [ -e $CustomApp3LogSource ]; then cp $CustomApp3LogSource $CustomApp3Folder
 	else
 		echo -e "$CustomApp3Name does not have a log file available to grab.\n" >> $results
 	fi
@@ -341,15 +341,11 @@ Zip_Folder() {
 	rm -r $log_folder
 }
 ####################################################################################################
-####################################################################################################
-####################################################################################################
 # Set the Arrays you want to grab.
 # Default Array is logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance")
 	
-declare -a logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+declare -a logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
-####################################################################################################
-####################################################################################################
 ####################################################################################################
 # Put it all together in the Master Array
 
@@ -412,6 +408,6 @@ logGrabberMasterArray() {
 #Runs the Log Grabber as configured
 logGrabberMasterArray 
 #Run cleanup Array to remove empty folders
-Cleanup
+#Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
-Zip_Folder 
+#Zip_Folder 
