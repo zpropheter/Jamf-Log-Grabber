@@ -85,6 +85,12 @@ Jamf() {
 	else
 		echo -e "Jamf Client Logs not found\n" >> $results
 	fi
+	#ADD JAMF Remote Assist Log Folder
+	if [ -e /Users/Shared/jamfdata/logs ]; then cp -r "/Users/Shared/jamfdata/logs" $JSS/Remote_Assist
+		echo -e "Jamf Remote Assist session logs found. Copied to JSS/Remote_Assist folder\n" >> $results
+	else
+		echo -e "Jamf Remote Assist logs not found. Only available on Jamf Pro 11.1.0 and up.\n" >> $results
+	fi
 	#CHECK FOR JAMF INSTALL LOGS
 	if [ -e /var/log/install.log ]; then cp "/var/log/install.log" $JSS 
 	else
