@@ -54,9 +54,9 @@ currenttime=$(date +"%D %T")
 #You can add custom app log grabbing using the following rubric, just continue numbering the appnames or renaming them to fit your needs
 #You can pass jamf script variables as part of a policy to get your additional apps
 
-CustomApp1Name="DEPNotify"
+CustomApp1Name="$4"
 CustomApp1Folder=$log_folder/$CustomApp1Name
-CustomApp1LogSource="/var/tmp/depnotify.log"
+CustomApp1LogSource="$5"
 #Now go down to CustomApp1Array and put in the files you want to grab
 CustomApp2Name="$6"
 CustomApp2Folder=$log_folder/$CustomApp2Name
