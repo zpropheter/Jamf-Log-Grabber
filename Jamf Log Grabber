@@ -209,11 +209,8 @@ Recon_Troubleshoot() {
 		echo -e "\nRecon leftovers found and listed above\nTo remediate, take the following steps:\n1. Open the other files in this folder\n2.Find the Extension Attribute that matches the script in this file\n3.Remove or remediate the associate Extension Attribute Script\n4.Confirm by running a 'Sudo Jamf Recon' and verifying the files do not return.\n" >> $recon/Leftovers.txt
 		#REPORT IN RESULTS FILE THAT LEFTOVERS WERE FOUND
 		echo -e "\nRecon Troubleshoot found files in the /tmp directory that should not be there. A report of these files as well as next actions can be found in the Leftovers.txt file in the Recon Directory.\n" >> $results
-		#for loop that runs a cat on the files found by $reconleftovers
-		for badExtensionAttributes in $reconleftovers
-		do touch $recon/$badExtensionAttributes
-			cat /Library/Application\ Support/Jamf/tmp/$badExtensionAttributes >> $recon/Fix_This_EA_$badExtensionAttributes
-		done
+		#copy all files in tmp folder to recon results folder
+			cp -r /Library/Application\ Support/Jamf/tmp/ $recon/
 	fi
 }
 ####################################################################################################
