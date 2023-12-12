@@ -54,9 +54,9 @@ currenttime=$(date +"%D %T")
 #You can add custom app log grabbing using the following rubric, just continue numbering the appnames or renaming them to fit your needs
 #You can pass jamf script variables as part of a policy to get your additional apps
 
-CustomApp1Name="DEPNotify"
+CustomApp1Name="$4"
 CustomApp1Folder=$log_folder/$CustomApp1Name
-CustomApp1LogSource="/var/tmp/depnotify.log"
+CustomApp1LogSource="$5"
 #Now go down to CustomApp1Array and put in the files you want to grab
 CustomApp2Name="$6"
 CustomApp2Folder=$log_folder/$CustomApp2Name
@@ -209,11 +209,8 @@ Recon_Troubleshoot() {
 		echo -e "\nRecon leftovers found and listed above\nTo remediate, take the following steps:\n1. Open the other files in this folder\n2.Find the Extension Attribute that matches the script in this file\n3.Remove or remediate the associate Extension Attribute Script\n4.Confirm by running a 'Sudo Jamf Recon' and verifying the files do not return.\n" >> $recon/Leftovers.txt
 		#REPORT IN RESULTS FILE THAT LEFTOVERS WERE FOUND
 		echo -e "\nRecon Troubleshoot found files in the /tmp directory that should not be there. A report of these files as well as next actions can be found in the Leftovers.txt file in the Recon Directory.\n" >> $results
-		#for loop that runs a cat on the files found by $reconleftovers
-		for badExtensionAttributes in $reconleftovers
-		do touch $recon/$badExtensionAttributes
-			cat /Library/Application\ Support/Jamf/tmp/$badExtensionAttributes >> $recon/Fix_This_EA_$badExtensionAttributes
-		done
+		#copy all files in tmp folder to recon results folder
+			cp -r /Library/Application\ Support/Jamf/tmp/ $recon/
 	fi
 }
 ####################################################################################################
