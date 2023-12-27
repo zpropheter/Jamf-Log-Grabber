@@ -41,6 +41,7 @@ managed_preferences=$log_folder/Managed_Preferences
 recon=$log_folder/Recon
 self_service=$log_folder/Self_Service
 Device_Compliance=$log_folder/Device_Compliance
+JRA=$log_folder/JRA
 loggedInUser=$( echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }' )
 reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
 
@@ -85,12 +86,6 @@ Jamf() {
 	else
 		echo -e "Jamf Client Logs not found\n" >> $results
 	fi
-	#ADD JAMF Remote Assist Log Folder
-	if [ -e /Users/Shared/jamfdata/logs ]; then cp -r "/Users/Shared/jamfdata/logs" $JSS/Remote_Assist
-		echo -e "Jamf Remote Assist session logs found. Copied to JSS/Remote_Assist folder\n" >> $results
-	else
-		echo -e "Jamf Remote Assist logs not found. Only available on Jamf Pro 11.1.0 and up.\n" >> $results
-	fi
 	#CHECK FOR JAMF INSTALL LOGS
 	if [ -e /var/log/install.log ]; then cp "/var/log/install.log" $JSS 
 	else
@@ -113,6 +108,7 @@ Jamf() {
 	else
 		echo -e "Jamf Self Service Logs not found\n" >> $results
 	fi
+	sudo profiles show -output $JSS/profiles.xml stdout-xml
 }
 
 ####################################################################################################
@@ -183,6 +179,8 @@ Protect() {
 	#CHECK FOR JAMF PROTECT PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
 	if [ -e /Library/Managed\ Preferences/com.jamf.protect.plist ]; then cp "/Library/Managed Preferences/com.jamf.protect.plist" "$security/com.jamf.protect.plist"
 		plutil -convert xml1 "$security/com.jamf.protect.plist"
+		protectctl info > $security/jamfprotectinfo.log
+		protectctl version > $security/jamfprotectinfo.log
 	else
 		echo -e "Jamf Protect plist not found\n" >> $results
 	fi
@@ -192,8 +190,6 @@ Protect() {
 	else
 		echo -e "Jamf Trust plist not found\n" >> $results
 	fi
-	protectctl info > $security/jamfprotectinfo.log
-	protectctl version > $security/jamfprotectinfo.log
 }
 
 ####################################################################################################
@@ -287,6 +283,31 @@ DeviceCompliance() {
 }
 
 ####################################################################################################
+#Array for Device Compliance
+Remote_Assist() {
+	#ADD JAMF Remote Assist Log Folder
+	if [ -e /Users/Shared/jamfdata ]; then cp -r "/Users/Shared/jamfdata" $JRA
+		echo -e "Jamf Remote Assist session logs found. Copied to JSS/Remote_Assist folder\n" >> $results
+		touch $JRA/JRA_Info.txt
+		successfulFileDownloads=$(grep -R "File:" /Users/Shared/jamfdata/log/Connect/DragSimulator/ | awk '/Transfer Successful!/' | sed 's/^.*File://' | sed 's/Transfer Successful!//g')
+		if [[ $successfulFileDownloads == "" ]]; then 
+			echo "No File Transfers found from most recent session" >> $JRA/JRA_Info.txt
+		else
+			echo -e "The files most recently downloaded from Jamf Remote Assist are: $successfulFileDownloads" >> $JRA/JRA_Info.txt
+		fi
+		lastremote=$(grep -r "grapplemdm::ipc::tcp::TcpConnector::Connect(ipc::ListenerIdentifier::Ref) connected to 127.0.0.1:" /Users/Shared/jamfdata/log/Connect/ | sed 's/^.*log://' | awk '{print $1}')
+		if [[ $lastremote == "" ]]; then 
+			echo "No Remote Sessions have been launched by Jamf Remote Assist on this device or the logs have been manually cleared." >> $JRA/JRA_Info.txt
+		else
+			echo "Last Jamf Remote Assist session listed below:" >> $JRA/JRA_Info.txt
+			echo ${lastremote:1} | awk '{print $1}' >> $JRA/JRA_Info.txt
+		fi		
+	else
+		echo -e "Jamf Remote Assist logs not found. Only available on Jamf Pro 11.1.0 and up.\n" >> $results
+	fi
+}
+
+####################################################################################################
 #Array for App Named in Dynamic Variables
 #When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
 CustomApp1Array() {
@@ -319,13 +340,12 @@ CustomApp3Array() {
 	fi
 }
 
-
 ####################################################################################################
 
 #Array for folder cleanup
 Cleanup() {
 	#IF A VARIABLE ABOVE IS SET TO 'FALSE', REMOVE THE FOLDER NAME FOR IT BELOW TO AVOID ERRORS WITH THE CLEANUP FUNCTION AT THE END OF THE SCRIPT
-	cleanup=("JSS Recon Self_Service Connect Jamf_Security Managed_Preferences Device_Compliance $CustomApp1Name $CustomApp2Name $CustomApp3Name")
+	cleanup=("JSS Recon Self_Service Connect Jamf_Security Managed_Preferences Device_Compliance Remote_Assist $CustomApp1Name $CustomApp2Name $CustomApp3Name")
 	#CLEANS OUT EMPTY FOLDERS TO AVOID CONFUSION
 	echo -e "Cleaning out empty folders from the directory...." >> $results
 	for emptyfolder in $cleanup
@@ -351,9 +371,9 @@ Zip_Folder() {
 }
 ####################################################################################################
 # Set the Arrays you want to grab.
-# Default Array is logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+# Default Array is logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "Remote_Assist" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
-declare -a logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+declare -a logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "Remote_Assist" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
 ####################################################################################################
 # Put it all together in the Master Array
@@ -393,6 +413,9 @@ logGrabberMasterArray() {
 			;;
 			Device_Compliance)
 				DeviceCompliance 
+			;;
+			Remote_Assist)
+				Remote_Assist  
 			;;
 			"$CustomApp1Name")
 				#Add or Remove comment from line below to disable or enable the array for the custom app
