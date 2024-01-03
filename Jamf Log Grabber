@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#Jamf Log Grabber is designed to collect any logs associated with Jamf Products as well as MDM Managed Preferences. It features start and finish notifications for end users to be notified if desired
-#Jamf Products currently supported: Jamf Binary (including Recon Troubleshooting), Jamf Connect, Jamf Security (Protect and Trust) 
+#Jamf Log Grabber is designed to collect any logs associated with Jamf Products as well as MDM Managed Preferences.
+#Jamf Products currently supported: Jamf Binary (including Recon Troubleshooting), Jamf Connect, Jamf Security (Protect and Trust), App Installers, and Jamf Remote Assist
 #Log Grabber 2.0 revamp started 11/18 to design a more easy to customize workflow for grabbing logs
 
 #Arrays are now set for each individual type of log. Simply add or remove array names to call them in the script (Line 278)
@@ -41,6 +41,8 @@ managed_preferences=$log_folder/Managed_Preferences
 recon=$log_folder/Recon
 self_service=$log_folder/Self_Service
 Device_Compliance=$log_folder/Device_Compliance
+JRA=$log_folder/JRA
+App_Installers=$log_folder/App_Installers
 loggedInUser=$( echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }' )
 reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
 
@@ -75,21 +77,15 @@ Jamf() {
 	mkdir -p $log_folder/JSS
 	#FIND AND COPY THE JAMF SOFTWARE PLIST THEN CONVERT IT TO A READABLE FORMAT.
 	#COPY DEBUG LOG
-	if [ -e /Users/$loggedInUser/Library/Preferences/com.jamfsoftware.jamf.plist ]; then cp "/Library/Preferences/com.jamfsoftware.jamf.plist" "$JSS/com.jamfsoftware.jamf.plist" | plutil -convert xml1 "$JSS/com.jamfsoftware.jamf.plist" | log show --style compact --predicate 'subsystem == "com.jamfsoftware.jamf"' --debug > "$JSS/Jamfsoftware.log"
+	if [ -e /Users/$loggedInUser/Library/Preferences/com.jamfsoftware.jamf.plist ]; then cp "/Library/Preferences/com.jamfsoftware.jamf.plist" "$JSS/com.jamfsoftware.jamf.plist" | plutil -convert xml1 "$JSS/com.jamfsoftware.jamf.plist"
 	else
 		echo -e "Jamf Software plist not found\n" >> $results
 	fi
 	#ADD JAMF CLIENT LOGS TO LOG FOLDER
 	if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS
-		echo -e "Jamf.log found on machine for information about what this reports visit this URL:\nhttps://learn.jamf.com/bundle/jamf-pro-documentation-current/page/Components_Installed_on_Managed_Computers.html\n" >> $results
+		echo -e "Jamf.log found\n" >> $results
 	else
 		echo -e "Jamf Client Logs not found\n" >> $results
-	fi
-	#ADD JAMF Remote Assist Log Folder
-	if [ -e /Users/Shared/jamfdata/logs ]; then cp -r "/Users/Shared/jamfdata/logs" $JSS/Remote_Assist
-		echo -e "Jamf Remote Assist session logs found. Copied to JSS/Remote_Assist folder\n" >> $results
-	else
-		echo -e "Jamf Remote Assist logs not found. Only available on Jamf Pro 11.1.0 and up.\n" >> $results
 	fi
 	#CHECK FOR JAMF INSTALL LOGS
 	if [ -e /var/log/install.log ]; then cp "/var/log/install.log" $JSS 
@@ -103,7 +99,7 @@ Jamf() {
 	fi
 	#FIND AND COPY JAMF SOFTWARE PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
 	#COPY DEBUG LOG
-	if [ -e /Library/Preferences/com.jamfsoftware.jamf.plist ]; then cp "/Library/Preferences/com.jamfsoftware.jamf.plist" "$JSS/com.jamfsoftware.jamf.plist" | plutil -convert xml1 "$JSS/com.jamfsoftware.jamf.plist" | log show --style compact --predicate 'subsystem == "com.jamfsoftware.jamf"' --debug > "$JSS/Jamfsoftware.log"
+	if [ -e /Library/Preferences/com.jamfsoftware.jamf.plist ]; then cp "/Library/Preferences/com.jamfsoftware.jamf.plist" "$JSS/com.jamfsoftware.jamf.plist" | plutil -convert xml1 "$JSS/com.jamfsoftware.jamf.plist" 
 	else
 		echo -e "Jamf Connect Login plist not found\n" >> $results
 	fi
@@ -113,6 +109,7 @@ Jamf() {
 	else
 		echo -e "Jamf Self Service Logs not found\n" >> $results
 	fi
+	sudo profiles show -output $JSS/profiles.xml stdout-xml
 }
 
 ####################################################################################################
@@ -130,6 +127,7 @@ Connect() {
 			echo "-No Kerberos Ticket for Current Logged in User" > $connect/klist_manuallyCollected.txt; else
 				echo $kerblist > $connect/klist_manuallyCollected.txt; 
 			fi
+	else
 		echo -e "-No Jamf Connect Installed, doing nothing\n" >> $results
 	fi
 	#CHECK FOR JAMF CONNECT LOGIN LOGS AND PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
@@ -170,7 +168,7 @@ Connect() {
 	#LIST AUTHCHANGER SETTIGNS
 	if [ -e /usr/local/bin/authchanger ]; then
 		/usr/local/bin/authchanger -print > "$connect/authchanger_manuallyCollected.txt"
-		echo -e "-Authchanger changes the authentication database for MacOS.\nMore info can be found at this URL:\nhttps://learn.jamf.com/bundle/jamf-connect-documentation-current/page/authchanger.html\nReview the authchanger_manuallyCollected.txt file to see your settings and determine if Authchanger needs to be modified for your environment.\n" >> $results;
+		:
 	else
 		echo -e "-No Authchanger settings found\n" >> $results
 	fi
@@ -183,6 +181,8 @@ Protect() {
 	#CHECK FOR JAMF PROTECT PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
 	if [ -e /Library/Managed\ Preferences/com.jamf.protect.plist ]; then cp "/Library/Managed Preferences/com.jamf.protect.plist" "$security/com.jamf.protect.plist"
 		plutil -convert xml1 "$security/com.jamf.protect.plist"
+		protectctl info > $security/jamfprotectinfo.log
+		protectctl version > $security/jamfprotectinfo.log
 	else
 		echo -e "Jamf Protect plist not found\n" >> $results
 	fi
@@ -192,8 +192,6 @@ Protect() {
 	else
 		echo -e "Jamf Trust plist not found\n" >> $results
 	fi
-	protectctl info > $security/jamfprotectinfo.log
-	protectctl version > $security/jamfprotectinfo.log
 }
 
 ####################################################################################################
@@ -217,31 +215,32 @@ Recon_Troubleshoot() {
 #Array for MDM Communication Check
 #IF A DEVICE IS NOT COMMUNICATING WITH MDM, THIS WILL GIVE ITEMS TO LOOK INTO
 MDMCommunicationCheck() {
+	touch $log_folder/MDMCheck.txt
 	#WRITE TO LOGS WHAT WE ARE DOING NEXT
-	echo -e "Checking $loggedInUser's computer for MDM communication issues:" >> $results
+	echo -e "Checking $loggedInUser's computer for MDM communication issues:" >> $log_folder/MDMCheck.txt
 	#CHECK MDM STATUS AND ADVISE IF IT IS COMMUNICATING
 	result=$(log show --style compact --predicate '(process CONTAINS "mdmclient")' --last 1d | grep "Unable to create MDM identity")
 	if [[ $result == '' ]]; then
-		echo -e "-MDM is communicating" >> $results
+		echo -e "-MDM is communicating" >> $log_folder/MDMCheck.txt
 	else
-		echo -e "-MDM is broken" >> $results
+		echo -e "-MDM is broken" >> $log_folder/MDMCheck.txt
 	fi
 	#CHECK FOR THE MDM PROFILE TO BE INSTALLED
 	mdmProfile=$(/usr/libexec/mdmclient QueryInstalledProfiles | grep "00000000-0000-0000-A000-4A414D460003")
 	if [[ $mdmProfile == "" ]]; then
-		echo -e "-MDM Profile Not Installed" >> $results
+		echo -e "-MDM Profile Not Installed" >> $log_folder/MDMCheck.txt
 	else
-		echo -e "-MDM Profile Installed" >> $results
+		echo -e "-MDM Profile Installed" >> $log_folder/MDMCheck.txt
 	fi
 	#TELL THE STATUS OF THE MDM DAEMON
 	mdmDaemonStatus=$(/System/Library/PrivateFrameworks/ApplePushService.framework/apsctl status | grep -A 18 com.apple.aps.mdmclient.daemon.push.production | awk -F':' '/persistent connection status/ {print $NF}' | sed 's/^ *//g')
-	echo -e "-The MDM Daemon Status is:$mdmDaemonStatus" >> $results
+	echo -e "-The MDM Daemon Status is:$mdmDaemonStatus" >> $log_folder/MDMCheck.txt
 	#WRITE THE APNS TOPIC TO THE RESULTS FILE IF IT EXISTS
 	profileTopic=$(system_profiler SPConfigurationProfileDataType | grep "Topic" | awk -F '"' '{ print $2 }');
 	if [ "$profileTopic" != "" ]; then
-		echo -e "-APNS Topic is: $profileTopic\n" >> $results
+		echo -e "-APNS Topic is: $profileTopic\n" >> $log_folder/MDMCheck.txt
 	else
-		echo -e "-No APNS Topic Found\n" >> $results
+		echo -e "-No APNS Topic Found\n" >> $log_folder/MDMCheck.txt
 	fi
 }
 ####################################################################################################
@@ -250,7 +249,7 @@ Managed_Preferences_Array() {
 	mkdir -p $log_folder/Managed_Preferences
 	#CHECK FOR MANAGED PREFERENCE PLISTS, THEN COPY AND CONVERT THEM TO A READABLE FORMAT
 	if [ -e /Library/Managed\ Preferences/ ]; then cp /Library/Managed\ Preferences/*.plist $managed_preferences
-		echo -e "The Managed Preferences folder deploys plists that tell the referenced application what parameters to follow. If you deployed settings to an application that aren't applying, make sure the preference domain plist is deployed to this folder.Check the Managed_Preferences output for results.\n" >> $results
+		:
 	else
 		echo -e "No Managed Preferences plist files found\n" >> $results
 	fi
@@ -287,6 +286,43 @@ DeviceCompliance() {
 }
 
 ####################################################################################################
+#Array for Device Compliance
+Remote_Assist() {
+	#ADD JAMF Remote Assist Log Folder
+	mkdir -p $JRA/Remote_Assist_Logs
+	if [ -e /Users/Shared/jamfdata ]; then cp -r "/Users/Shared/jamfdata" $JRA/Remote_Assist_Logs
+		echo -e "Jamf Remote Assist session logs found. Copied to JRA/Remote_Assist_Logs folder\n" >> $results
+		touch $JRA/Info.txt
+		successfulFileDownloads=$(grep -R "File:" /Users/Shared/jamfdata/log/Connect/DragSimulator/ | awk '/Transfer Successful!/' | sed 's/^.*File://' | sed 's/Transfer Successful!//g')
+		if [[ $successfulFileDownloads == "" ]]; then 
+			echo "No File Transfers found from most recent session" >> $JRA/Info.txt
+		else
+			echo -e "The files most recently downloaded from Jamf Remote Assist are: $successfulFileDownloads" >> $JRA/JRA_Info.txt
+		fi
+		lastremote=$(grep -r "grapplemdm::ipc::tcp::TcpConnector::Connect(ipc::ListenerIdentifier::Ref) connected to 127.0.0.1:" /Users/Shared/jamfdata/log/Connect/ | sed 's/^.*log://' | awk '{print $1}')
+		if [[ $lastremote == "" ]]; then 
+			echo "No Remote Sessions have been launched by Jamf Remote Assist on this device or the logs have been manually cleared." >> $JRA/JRA_Info.txt
+		else
+			echo "Last Jamf Remote Assist session listed below:" >> $JRA/Info.txt
+			echo ${lastremote:1} | awk '{print $1}' >> $JRA/Info.txt
+		fi		
+	else
+		echo -e "Jamf Remote Assist logs not found. Only available on Jamf Pro 11.1.0 and up.\n" >> $results
+	fi
+}
+
+####################################################################################################
+#Array for App Installers Directory
+#When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
+AppInstallers() {
+	mkdir -p $App_Installers
+	if [ -e /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/ ]; then cp -r /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/ directory $App_Installers
+	else
+		echo -e "App Installer Directory not found, device is not in scope for any App Installers or is not receiving the App Installer command from Jamf.\n" >> $results
+	fi
+}
+
+####################################################################################################
 #Array for App Named in Dynamic Variables
 #When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
 CustomApp1Array() {
@@ -319,26 +355,23 @@ CustomApp3Array() {
 	fi
 }
 
-
 ####################################################################################################
 
 #Array for folder cleanup
 Cleanup() {
 	#IF A VARIABLE ABOVE IS SET TO 'FALSE', REMOVE THE FOLDER NAME FOR IT BELOW TO AVOID ERRORS WITH THE CLEANUP FUNCTION AT THE END OF THE SCRIPT
-	cleanup=("JSS Recon Self_Service Connect Jamf_Security Managed_Preferences Device_Compliance $CustomApp1Name $CustomApp2Name $CustomApp3Name")
+	cleanup=("JSS Recon Self_Service Connect Jamf_Security Managed_Preferences Device_Compliance JRA App_Installers $CustomApp1Name $CustomApp2Name $CustomApp3Name")
 	#CLEANS OUT EMPTY FOLDERS TO AVOID CONFUSION
-	echo -e "Cleaning out empty folders from the directory...." >> $results
+	echo "The following folders contained no files and were removed:" >> $results
 	for emptyfolder in $cleanup
 	do	
 		if [ -z "$(ls -A /$log_folder/$emptyfolder)" ]; then
-			echo -e "-$emptyfolder folder is empty, removing folder" >>$results 
+			echo -e "-$emptyfolder" >>$results 
 			rm -r $log_folder/$emptyfolder
 		else
-			echo -e "-$emptyfolder folder is not empty, leaving folder" >>$results
+			:
 		fi
 	done
-	echo -e "-Finished cleaning up.\n" >> $results
-	#STAMP TIME COMPLETED BEFORE ZIPPING FILES
 	echo -e "Completed Log Grabber on '$currenttime'\n" >> $results
 }
 
@@ -351,9 +384,9 @@ Zip_Folder() {
 }
 ####################################################################################################
 # Set the Arrays you want to grab.
-# Default Array is logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+# Default Array is logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
-declare -a logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+declare -a logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
 ####################################################################################################
 # Put it all together in the Master Array
@@ -394,6 +427,12 @@ logGrabberMasterArray() {
 			Device_Compliance)
 				DeviceCompliance 
 			;;
+			Remote_Assist)
+				Remote_Assist  
+			;;
+			App_Installers)
+				AppInstallers 
+			;;
 			"$CustomApp1Name")
 				#Add or Remove comment from line below to disable or enable the array for the custom app
 				CustomApp1Array  
@@ -420,3 +459,6 @@ logGrabberMasterArray
 Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
 Zip_Folder 
+
+#incorporate more log show commands for Jamf binary
+#log show --style compact --predicate 'subsystem == "com.jamf.management.daemon"' --debug > ~/Desktop/test.txt
