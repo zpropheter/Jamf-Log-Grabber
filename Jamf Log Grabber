@@ -448,3 +448,6 @@ Zip_Folder
 
 #incorporate more log show commands for Jamf binary
 #log show --style compact --predicate 'subsystem == "com.jamf.management.daemon"' --debug > ~/Desktop/test.txt
+
+
+#add app installer array for /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/_Completed directory
