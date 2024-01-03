@@ -372,8 +372,6 @@ Cleanup() {
 			:
 		fi
 	done
-	echo -e "-Finished cleaning up.\n" >> $results
-	#STAMP TIME COMPLETED BEFORE ZIPPING FILES
 	echo -e "Completed Log Grabber on '$currenttime'\n" >> $results
 }
 
