@@ -42,6 +42,7 @@ recon=$log_folder/Recon
 self_service=$log_folder/Self_Service
 Device_Compliance=$log_folder/Device_Compliance
 JRA=$log_folder/JRA
+App_Installers=$log_folder/App_Installers
 loggedInUser=$( echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }' )
 reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
 
@@ -126,6 +127,7 @@ Connect() {
 			echo "-No Kerberos Ticket for Current Logged in User" > $connect/klist_manuallyCollected.txt; else
 				echo $kerblist > $connect/klist_manuallyCollected.txt; 
 			fi
+	else
 		echo -e "-No Jamf Connect Installed, doing nothing\n" >> $results
 	fi
 	#CHECK FOR JAMF CONNECT LOGIN LOGS AND PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
@@ -166,7 +168,7 @@ Connect() {
 	#LIST AUTHCHANGER SETTIGNS
 	if [ -e /usr/local/bin/authchanger ]; then
 		/usr/local/bin/authchanger -print > "$connect/authchanger_manuallyCollected.txt"
-		echo -e "-Authchanger changes the authentication database for MacOS.\nMore info can be found at this URL:\nhttps://learn.jamf.com/bundle/jamf-connect-documentation-current/page/authchanger.html\nReview the authchanger_manuallyCollected.txt file to see your settings and determine if Authchanger needs to be modified for your environment.\n" >> $results;
+		:
 	else
 		echo -e "-No Authchanger settings found\n" >> $results
 	fi
@@ -247,7 +249,7 @@ Managed_Preferences_Array() {
 	mkdir -p $log_folder/Managed_Preferences
 	#CHECK FOR MANAGED PREFERENCE PLISTS, THEN COPY AND CONVERT THEM TO A READABLE FORMAT
 	if [ -e /Library/Managed\ Preferences/ ]; then cp /Library/Managed\ Preferences/*.plist $managed_preferences
-		echo -e "The Managed Preferences folder deploys plists that tell the referenced application what parameters to follow. If you deployed settings to an application that aren't applying, make sure the preference domain plist is deployed to this folder.Check the Managed_Preferences output for results.\n" >> $results
+		:
 	else
 		echo -e "No Managed Preferences plist files found\n" >> $results
 	fi
@@ -310,6 +312,17 @@ Remote_Assist() {
 }
 
 ####################################################################################################
+#Array for App Installers Directory
+#When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
+AppInstallers() {
+	mkdir -p $App_Installers
+	if [ -e /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/ ]; then cp -r /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/ directory $App_Installers
+	else
+		echo -e "App Installer Directory not found, device is not in scope for any App Installers or is not receiving the App Installer command from Jamf.\n" >> $results
+	fi
+}
+
+####################################################################################################
 #Array for App Named in Dynamic Variables
 #When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
 CustomApp1Array() {
@@ -347,16 +360,16 @@ CustomApp3Array() {
 #Array for folder cleanup
 Cleanup() {
 	#IF A VARIABLE ABOVE IS SET TO 'FALSE', REMOVE THE FOLDER NAME FOR IT BELOW TO AVOID ERRORS WITH THE CLEANUP FUNCTION AT THE END OF THE SCRIPT
-	cleanup=("JSS Recon Self_Service Connect Jamf_Security Managed_Preferences Device_Compliance Remote_Assist $CustomApp1Name $CustomApp2Name $CustomApp3Name")
+	cleanup=("JSS Recon Self_Service Connect Jamf_Security Managed_Preferences Device_Compliance JRA App_Installers $CustomApp1Name $CustomApp2Name $CustomApp3Name")
 	#CLEANS OUT EMPTY FOLDERS TO AVOID CONFUSION
-	echo -e "Cleaning out empty folders from the directory...." >> $results
+	echo "The following folders contained no files and were removed:" >> $results
 	for emptyfolder in $cleanup
 	do	
 		if [ -z "$(ls -A /$log_folder/$emptyfolder)" ]; then
-			echo -e "-$emptyfolder folder is empty, removing folder" >>$results 
+			echo -e "-$emptyfolder" >>$results 
 			rm -r $log_folder/$emptyfolder
 		else
-			echo -e "-$emptyfolder folder is not empty, leaving folder" >>$results
+			:
 		fi
 	done
 	echo -e "-Finished cleaning up.\n" >> $results
@@ -373,9 +386,9 @@ Zip_Folder() {
 }
 ####################################################################################################
 # Set the Arrays you want to grab.
-# Default Array is logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "Remote_Assist" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+# Default Array is logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
-declare -a logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "Remote_Assist" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+declare -a logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
 ####################################################################################################
 # Put it all together in the Master Array
@@ -419,6 +432,9 @@ logGrabberMasterArray() {
 			Remote_Assist)
 				Remote_Assist  
 			;;
+			App_Installers)
+				AppInstallers 
+			;;
 			"$CustomApp1Name")
 				#Add or Remove comment from line below to disable or enable the array for the custom app
 				CustomApp1Array  
@@ -448,6 +464,3 @@ Zip_Folder
 
 #incorporate more log show commands for Jamf binary
 #log show --style compact --predicate 'subsystem == "com.jamf.management.daemon"' --debug > ~/Desktop/test.txt
-
-
-#add app installer array for /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/_Completed directory
