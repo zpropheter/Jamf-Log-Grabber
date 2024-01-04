@@ -291,7 +291,6 @@ Remote_Assist() {
 	#ADD JAMF Remote Assist Log Folder
 	mkdir -p $JRA/Remote_Assist_Logs
 	if [ -e /Users/Shared/jamfdata ]; then cp -r "/Users/Shared/jamfdata" $JRA/Remote_Assist_Logs
-		echo -e "Jamf Remote Assist session logs found. Copied to JRA/Remote_Assist_Logs folder\n" >> $results
 		touch $JRA/Info.txt
 		successfulFileDownloads=$(grep -R "File:" /Users/Shared/jamfdata/log/Connect/DragSimulator/ | awk '/Transfer Successful!/' | sed 's/^.*File://' | sed 's/Transfer Successful!//g')
 		if [[ $successfulFileDownloads == "" ]]; then 
