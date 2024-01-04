@@ -297,11 +297,11 @@ Remote_Assist() {
 		if [[ $successfulFileDownloads == "" ]]; then 
 			echo "No File Transfers found from most recent session" >> $JRA/Info.txt
 		else
-			echo -e "The files most recently downloaded from Jamf Remote Assist are: $successfulFileDownloads" >> $JRA/JRA_Info.txt
+			echo -e "The files most recently downloaded from Jamf Remote Assist are: $successfulFileDownloads" >> $JRA/Info.txt
 		fi
 		lastremote=$(grep -r "grapplemdm::ipc::tcp::TcpConnector::Connect(ipc::ListenerIdentifier::Ref) connected to 127.0.0.1:" /Users/Shared/jamfdata/log/Connect/ | sed 's/^.*log://' | awk '{print $1}')
 		if [[ $lastremote == "" ]]; then 
-			echo "No Remote Sessions have been launched by Jamf Remote Assist on this device or the logs have been manually cleared." >> $JRA/JRA_Info.txt
+			echo "No Remote Sessions have been launched by Jamf Remote Assist on this device or the logs have been manually cleared." >> $JRA/Info.txt
 		else
 			echo "Last Jamf Remote Assist session listed below:" >> $JRA/Info.txt
 			echo ${lastremote:1} | awk '{print $1}' >> $JRA/Info.txt
