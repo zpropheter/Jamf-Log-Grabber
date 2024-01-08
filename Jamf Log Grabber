@@ -75,6 +75,7 @@ CustomApp3LogSource="$9"
 #Array for Jamf Logs
 Jamf() {
 	mkdir -p $log_folder/JSS
+	log show --predicate "process CONTAINS 'mdmclient'" > $JSS/MDMClient_LogShow.log
 	#ADD JAMF CLIENT LOGS TO LOG FOLDER
 	if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS
 	else
