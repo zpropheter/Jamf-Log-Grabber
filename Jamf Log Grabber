@@ -109,6 +109,18 @@ Jamf() {
 	else
 		echo -e "Jamf Self Service Logs not found\n" >> $results
 	fi
+	#Parse through all agents and deamons for any running keyword "jamf" and are not a part of standard Jamf applications. If none are found, they are still printed 
+	AgentsAndDaemonsDirty=$(grep -r "jamf" ~/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/)
+	AgentsAndDaemonsClean=$(grep -r "jamf" /Users/$loggedInUser/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/ | grep -vw "com.jamf.connect.plist" | grep -vw "com.jamf.connect.login.plist" | grep -vw "com.jamf.connect.unlock.login.plist" | grep -vw "com.jamf.management.agent.plist" | grep -vw "com.jamf.connect.daemon.plist" | grep -vw "com.jamf.management.daemon.plist" | grep -vw "com.jamfsoftware.Composer.helper.plist" | grep -vw "com.jamfsoftware.task.1.plist" | grep -vw "com.jamf.cloudmonitor.plist") 
+	case $AgentsAndDaemonsClean in
+		"")
+			echo -e "A search for custom Agents and Daemons containing 'jamf' keywords has been ran. No matches other than standard Jamf Applications were located. For thorough diagnostics a list of all Agents and Daemons containing 'jamf' keyword in JSS Folder. This includes standard Jamf Applications.\n" >> $results
+			echo -e "$AgentsAndDaemonsDirty" > $JSS/AgentsAndDaemons.txt
+		;;
+		*)
+			echo -e "Ths following Agents or Daemons were located and contain keyword 'jamf'\n $AgentsAndDaemonsClean" >> $results
+		;;
+	esac
 	sudo profiles show -output $JSS/profiles.xml stdout-xml
 }
 
