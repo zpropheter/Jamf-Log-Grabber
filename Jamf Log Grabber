@@ -75,12 +75,6 @@ CustomApp3LogSource="$9"
 #Array for Jamf Logs
 Jamf() {
 	mkdir -p $log_folder/JSS
-	#FIND AND COPY THE JAMF SOFTWARE PLIST THEN CONVERT IT TO A READABLE FORMAT.
-	#COPY DEBUG LOG
-	if [ -e /Users/$loggedInUser/Library/Preferences/com.jamfsoftware.jamf.plist ]; then cp "/Library/Preferences/com.jamfsoftware.jamf.plist" "$JSS/com.jamfsoftware.jamf.plist" | plutil -convert xml1 "$JSS/com.jamfsoftware.jamf.plist"
-	else
-		echo -e "Jamf Software plist not found\n" >> $results
-	fi
 	#ADD JAMF CLIENT LOGS TO LOG FOLDER
 	if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS
 	else
@@ -100,7 +94,7 @@ Jamf() {
 	#COPY DEBUG LOG
 	if [ -e /Library/Preferences/com.jamfsoftware.jamf.plist ]; then cp "/Library/Preferences/com.jamfsoftware.jamf.plist" "$JSS/com.jamfsoftware.jamf.plist" | plutil -convert xml1 "$JSS/com.jamfsoftware.jamf.plist" 
 	else
-		echo -e "Jamf Connect Login plist not found\n" >> $results
+		echo -e "Jamf Software plist not found\n" >> $results
 	fi
 	mkdir -p $log_folder/Self_Service
 	#check for jamf self service logs
@@ -117,10 +111,10 @@ Jamf() {
 			echo -e "$AgentsAndDaemonsDirty" > $JSS/AgentsAndDaemons.txt
 		;;
 		*)
-			echo -e "Ths following Agents or Daemons were located and contain keyword 'jamf'\n $AgentsAndDaemonsClean" >> $results
+			echo -e "The following Agents or Daemons were located and contain keyword 'jamf'\n $AgentsAndDaemonsClean" >> $results
 		;;
 	esac
-	sudo profiles show -output $JSS/profiles.xml stdout-xml
+	sudo profiles show -output $JSS/profiles.xml stdout-xml	
 }
 
 ####################################################################################################
@@ -273,11 +267,6 @@ Managed_Preferences_Array() {
 	else
 		echo -e "No files to convert to plist\n" >> $results
 	fi
-	#LIST ALL INSTALLED USER AND MACHINE PROFILES AND SAVE TO A .TXT FILE
-	profiles show > $log_folder/User_Installed_Profiles.txt
-	
-	#REMOVE COMMENT OT SEE MACHINE PROFILES. WILL REQUIRE SUDO PRIVELIGES
-	# sudo profiles show > $log_folder/User_Installed_Profiles.txt
 }
 
 ####################################################################################################
@@ -382,7 +371,7 @@ Cleanup() {
 			:
 		fi
 	done
-	echo -e "Completed Log Grabber on '$currenttime'\n" >> $results
+	echo -e "\nCompleted Log Grabber on '$currenttime'\n" >> $results
 }
 
 ####################################################################################################
