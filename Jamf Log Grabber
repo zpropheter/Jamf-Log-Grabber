@@ -83,7 +83,6 @@ Jamf() {
 	fi
 	#ADD JAMF CLIENT LOGS TO LOG FOLDER
 	if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS
-		echo -e "Jamf.log found\n" >> $results
 	else
 		echo -e "Jamf Client Logs not found\n" >> $results
 	fi
@@ -212,7 +211,7 @@ Recon_Troubleshoot() {
 	mkdir -p $log_folder/Recon
 	#check for Jamf Recon leftovers
 	if [[ $reconleftovers == "" ]]; then
-		echo -e "Recon Folder Empty, we love to see that!\n" >> $results
+		:
 	else
 		echo $reconleftovers > $recon/Leftovers.txt
 		#DIAGNOSTIC INFORMATION FOR RECON RESULTS. FOLLOWING THESE STEPS WILL HELP IDENTIFY PROBLEMATIC EXTENSION ATTRIBUTES AND/OR INVENTORY CHECK IN PROBLEMS
