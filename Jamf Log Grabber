@@ -32,7 +32,8 @@
 
 ####################################################################################################
 #HARD CODED VARIABLES, DO NOT CHANGE
-log_folder=$HOME/Desktop/Logs
+loggedInUser=$( echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }' )
+log_folder=$HOME/Desktop/"$loggedInUser"_logs
 results=$log_folder/Results.txt
 JSS=$log_folder/JSS
 security=$log_folder/Jamf_Security
@@ -43,7 +44,7 @@ self_service=$log_folder/Self_Service
 Device_Compliance=$log_folder/Device_Compliance
 JRA=$log_folder/JRA
 App_Installers=$log_folder/App_Installers
-loggedInUser=$( echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }' )
+
 reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
 
 #DATE FOR LOG FOLDER ZIP CREATION
@@ -75,7 +76,6 @@ CustomApp3LogSource="$9"
 #Array for Jamf Logs
 Jamf() {
 	mkdir -p $log_folder/JSS
-	log show --predicate "process CONTAINS 'mdmclient'" > $JSS/MDMClient_LogShow.log
 	#ADD JAMF CLIENT LOGS TO LOG FOLDER
 	if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS
 	else
@@ -105,7 +105,7 @@ Jamf() {
 	fi
 	#Parse through all agents and deamons for any running keyword "jamf" and are not a part of standard Jamf applications. If none are found, they are still printed 
 	AgentsAndDaemonsDirty=$(grep -r "jamf" ~/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/)
-	AgentsAndDaemonsClean=$(grep -r "jamf" /Users/$loggedInUser/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/ | grep -vw "com.jamf.connect.plist" | grep -vw "com.jamf.connect.login.plist" | grep -vw "com.jamf.connect.unlock.login.plist" | grep -vw "com.jamf.management.agent.plist" | grep -vw "com.jamf.connect.daemon.plist" | grep -vw "com.jamf.management.daemon.plist" | grep -vw "com.jamfsoftware.Composer.helper.plist" | grep -vw "com.jamfsoftware.task.1.plist" | grep -vw "com.jamf.cloudmonitor.plist" | grep -vw "com.jamf.management.jamfAAD.agent.plist" | grep -vw "com.jamf.remoteassist.connector.plist" | grep -vw "com.jamf.protect.plist") 
+	AgentsAndDaemonsClean=$(grep -r "jamf" /Users/$loggedInUser/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/ | grep -vw "com.jamf.connect.plist" | grep -vw "com.jamf.connect.login.plist" | grep -vw "com.jamf.connect.unlock.login.plist" | grep -vw "com.jamf.management.agent.plist" | grep -vw "com.jamf.connect.daemon.plist" | grep -vw "com.jamf.management.daemon.plist" | grep -vw "com.jamfsoftware.Composer.helper.plist" | grep -vw "com.jamfsoftware.task.1.plist" | grep -vw "com.jamf.cloudmonitor.plist" | grep -vw "com.jamf.remoteassist.connect.preloginagent.plist" | grep -vw "com.jamf.remoteassist.connect.userloginagent.plist" | grep -vw "com.jamf.remoteassist.connector.plist" | grep -vw "com.jamf.management.startup.plist") 
 	case $AgentsAndDaemonsClean in
 		"")
 			echo -e "A search for custom Agents and Daemons containing 'jamf' keywords has been ran. No matches other than standard Jamf Applications were located. For thorough diagnostics a list of all Agents and Daemons containing 'jamf' keyword in JSS Folder. This includes standard Jamf Applications.\n" >> $results
@@ -121,9 +121,10 @@ Jamf() {
 ####################################################################################################
 #Array for Jamf Connect Logs
 Connect() {
-	echo "Collecting Jamf Connect logs..." >>$results
-	mkdir -p $log_folder/Connect
+	echo "Checking for Jamf Connect" >> $results
 	if [ -e /Library/Managed\ Preferences/com.jamf.connect.plist ]; then
+		echo "Jamf Connect installed, collecting Jamf Connect logs..." >>$results
+		mkdir -p $log_folder/Connect
 		#OUTPUT ALL HISTORICAL JAMF CONNECT LOGS, THIS WILL ALWAYS GENERATE A LOG FILE EVEN IF CONNECT IS NOT INSTALLED
 		log show --style compact --predicate 'subsystem == "com.jamf.connect"' --debug > $connect/JamfConnect.log
 		#OUTPUT ALL HISTORICAL JAMF CONNECT LOGIN LOGS
@@ -133,9 +134,6 @@ Connect() {
 			echo "-No Kerberos Ticket for Current Logged in User" > $connect/klist_manuallyCollected.txt; else
 				echo $kerblist > $connect/klist_manuallyCollected.txt; 
 			fi
-	else
-		echo -e "-No Jamf Connect Installed, doing nothing\n" >> $results
-	fi
 	#CHECK FOR JAMF CONNECT LOGIN LOGS AND PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
 	if [ -e /tmp/jamf_login.log ]; then cp "/tmp/jamf_login.log" $connect/jamf_login_tmp.log
 	else
@@ -177,6 +175,9 @@ Connect() {
 		:
 	else
 		echo -e "-No Authchanger settings found\n" >> $results
+	fi
+	else
+		echo -e "-No Jamf Connect Installed, doing nothing\n" >> $results
 	fi
 }
 ####################################################################################################
@@ -379,7 +380,7 @@ Cleanup() {
 Zip_Folder() {
 	cd $HOME/Desktop
 	#NAME ZIPPED FOLDER WITH LOGGED IN USER AND TIME
-	zip $HOME/Desktop/"$loggedInUser"_logs_collected_"$currentlogdate".zip -r Logs
+	zip $HOME/Desktop/"$loggedInUser"_logs.zip -r "$loggedInUser"_logs
 	rm -r $log_folder
 }
 ####################################################################################################
@@ -463,3 +464,5 @@ Zip_Folder
 #incorporate more log show commands for Jamf binary
 #log show --style compact --predicate 'subsystem == "com.jamf.management.daemon"' --debug > ~/Desktop/test.txt
 #log show --predicate "process CONTAINS 'mdmclient'"
+
+#log show --style compact --predicate 'subsystem contains "com.jamf.management" and composedMessage contains "Running script"' --debug --info
