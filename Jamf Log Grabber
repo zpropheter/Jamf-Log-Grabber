@@ -115,6 +115,9 @@ Jamf() {
 			echo -e "The following Agents or Daemons were located and contain keyword 'jamf'\n $AgentsAndDaemonsClean" >> $results
 		;;
 	esac
+	#read blocked applications in jamf
+	sudo cat /Library/Application\ Support/JAMF/.jmf_settings.json > $JSS/restricted_software.json
+	#show installed profiles and output to xml. Use this to compare profile settings against actual settings in Managed Preferences Folder
 	sudo profiles show -output $JSS/profiles.xml stdout-xml	
 }
 
@@ -253,21 +256,16 @@ MDMCommunicationCheck() {
 ####################################################################################################
 #Array for Managed Preferences Collection
 Managed_Preferences_Array() {
-	mkdir -p $log_folder/Managed_Preferences
+	#mkdir -p $log_folder/Managed\ Preferences
 	#CHECK FOR MANAGED PREFERENCE PLISTS, THEN COPY AND CONVERT THEM TO A READABLE FORMAT
-	if [ -e /Library/Managed\ Preferences/ ]; then cp /Library/Managed\ Preferences/*.plist $managed_preferences
-		:
+	if [ -e /Library/Managed\ Preferences/ ]; then cp -r /Library/Managed\ Preferences $managed_preferences
+		#SLEEP TO ALLOW COPY TO FINISH PROCESSING ALL FILES
+		sleep 5
+		#UNABLE TO CHECK FOLDER FOR WILDCARD PLIST LIKE *.PLIST
+		plutil -convert xml1 $managed_preferences/*.plist
+		plutil -convert xml1 $managed_preferences/$loggedInUser/*.plist
 	else
 		echo -e "No Managed Preferences plist files found\n" >> $results
-	fi
-	#SLEEP TO ALLOW COPY TO FINISH PROCESSING ALL FILES
-	sleep 5
-	
-	#UNABLE TO CHECK FOLDER FOR WILDCARD PLIST LIKE *.PLIST
-	#IF THIS SECTION IS NOT WORKING, FIND A COMMON PLIST THAT IS DEPLOYED FLEET WIDE LIKE A NOTIFICATION PAYLOAD OR SYSTEM EXTENSIONS AND CHANGE IT IN THE NEXT LINE
-	if [ -e $managed_preferences/com.apple.TCC.configuration-profile-policy.plist ]; then plutil -convert xml1 $HOME/Desktop/Logs/managed_preferences/*.plist
-	else
-		echo -e "No files to convert to plist\n" >> $results
 	fi
 }
 
@@ -378,10 +376,10 @@ Cleanup() {
 
 ####################################################################################################
 Zip_Folder() {
-	cd $HOME/Desktop
+	#cd $HOME/Desktop
 	#NAME ZIPPED FOLDER WITH LOGGED IN USER AND TIME
 	zip $HOME/Desktop/"$loggedInUser"_logs.zip -r "$loggedInUser"_logs
-	rm -r $log_folder
+	#rm -r $log_folder
 }
 ####################################################################################################
 # Set the Arrays you want to grab.
