@@ -78,6 +78,7 @@ Jamf() {
 	mkdir -p $log_folder/JSS
 	#ADD JAMF CLIENT LOGS TO LOG FOLDER
 	if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS
+		grep  "Error" $JSS/jamf.log > $JSS/jamferror.log
 	else
 		echo -e "Jamf Client Logs not found\n" >> $results
 	fi
@@ -192,7 +193,6 @@ Protect() {
 	if [ -e /Library/Managed\ Preferences/com.jamf.protect.plist ]; then cp "/Library/Managed Preferences/com.jamf.protect.plist" "$security/com.jamf.protect.plist"
 		plutil -convert xml1 "$security/com.jamf.protect.plist"
 		protectctl info > $security/jamfprotectinfo.log
-		protectctl version > $security/jamfprotectinfo.log
 	else
 		echo -e "Jamf Protect plist not found\n" >> $results
 	fi
@@ -376,10 +376,10 @@ Cleanup() {
 
 ####################################################################################################
 Zip_Folder() {
-	#cd $HOME/Desktop
-	#NAME ZIPPED FOLDER WITH LOGGED IN USER AND TIME
-	zip $HOME/Desktop/"$loggedInUser"_logs.zip -r "$loggedInUser"_logs
-	#rm -r $log_folder
+	cd $HOME/Desktop
+	#NAME ZIPPED FOLDER WITH LOGGED IN USER
+	zip "$loggedInUser"_logs.zip -r "$loggedInUser"_logs
+	rm -r $log_folder
 }
 ####################################################################################################
 # Set the Arrays you want to grab.
@@ -462,4 +462,3 @@ Zip_Folder
 #incorporate more log show commands for Jamf binary
 #log show --style compact --predicate 'subsystem == "com.jamf.management.daemon"' --debug > ~/Desktop/test.txt
 #log show --predicate "process CONTAINS 'mdmclient'"
-
