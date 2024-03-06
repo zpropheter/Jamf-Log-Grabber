@@ -44,6 +44,7 @@ self_service=$log_folder/Self_Service
 Device_Compliance=$log_folder/Device_Compliance
 JRA=$log_folder/JRA
 App_Installers=$log_folder/App_Installers
+jamfLog=$JSS/jamf.log
 
 reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
 
@@ -52,6 +53,7 @@ currentlogdate=$(date)
 
 #DATE AND TIME FOR RESULTS.TXT INFORMATION
 currenttime=$(date +"%D %T")
+currenttime1=$(echo $currenttime | awk '{print $2}')
 
 ####################################################################################################
 #You can add custom app log grabbing using the following rubric, just continue numbering the appnames or renaming them to fit your needs
@@ -209,6 +211,17 @@ Protect() {
 Recon_Troubleshoot() {
 	mkdir -p $log_folder/Recon
 	#check for Jamf Recon leftovers
+	timefound=`grep -E -i '[0-9]+:[0-9]+' ${jamfLog} | awk '{print $4}' | tail -1`
+	echo $timefound > /dev/null
+	timeFoundNoSeconds=$(echo "${timefound:0:5}${timefound:8:3}")
+	currentTimeNoSeconds=$(echo "${currenttime1:0:5}${currenttime1:8:3}")
+	echo $timeFoundNoSeconds > /dev/null
+	echo $currentTimeNoSeconds > /dev/null
+	if [[ "$timeFoundNoSeconds" == "$currentTimeNoSeconds" ]]; then
+	echo -e "JLG appears to be running via policy, results in Recon directory may be inaccurate as files are stored there while policies are running\n" >> $results
+	else
+	echo -e "JLG appears to have been manually run. Results in Recon directory should be examined closely.\n" >> $results
+	fi
 	if [[ $reconleftovers == "" ]]; then
 		:
 	else
