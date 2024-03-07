@@ -124,6 +124,7 @@ Jamf() {
 	sudo profiles show -output $JSS/profiles.xml stdout-xml	
 }
 
+
 ####################################################################################################
 #Array for Jamf Connect Logs
 Connect() {
@@ -185,7 +186,51 @@ Connect() {
 	else
 		echo -e "-No Jamf Connect Installed, doing nothing\n" >> $results
 	fi
+	#CHECK THE JAMF CONNECT LICENSE FILE AND LOOK FOR OTHER PROFILES THAT MAY HAVE A JAMF CONNECT LICENSE
+	connectLicenseInstalled=$(defaults read $managed_preferences/com.jamf.connect.plist LicenseFile)
+	connectLoginLicenseInstalled=$(defaults read /Users/zach.propheter/Desktop/zach.propheter_logs/Managed_Preferences/zach.propheter/com.jamf.connect.login.plist LicenseFile)
+	profilesWithConnectLicense=$(grep -A 1 "LicenseFile" $JSS/profiles.xml | awk -F'<string>' '{print $2}' | sed 's/string>//g' | sed 's/<.*//;/^$/d')
+	connectLicenseExpiration=$(grep -A 1 "ExpirationDate" $connect/license.txt | awk '{ print $1 }' | sed 's/<string>//g' | sed 's/<.*//;/^$/d' | tr -d "-")
+	connectDateCompare=$(date +%Y%m%d)
+	
+	connectLicenseArray() {
+		for i in $profilesWithConnectLicense; do
+			if [[ "$i" == $connectLicenseInstalled ]]; then
+				echo -e "-Matching Profile found for installed Connect License (com.jamf.connect)." >> $results
+				if [ $connectDateCompare -ge $connectLicenseExpiration ]; then
+					echo "-Currently installed Jamf Connect License is expired" >> $results
+				else
+					echo "-Currently installed Jamf Connect License is valid" >> $results
+				fi
+			else
+				echo -e "-Mismatch between installed Connect license found in com.jamf.connect plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:\n $i\n " >> $results
+			fi
+		done
+	}
+	
+	connectLoginLicenseArray() {
+		for i in $profilesWithConnectLicense; do
+			if [[ "$i" == $connectLoginLicenseInstalled ]]; then
+				echo -e "-Matching Profile found for installed Connect License (com.jamf.connect.login)." >> $results
+				if [ $connectDateCompare -ge $connectLicenseExpiration ]; then
+					echo "-Currently installed Jamf Connect License is expired" >> $results
+				else
+					echo "-Currently installed Jamf Connect License is valid" >> $results
+				fi
+			else
+				echo -e "-Mismatch between installed Connect license found in com.jamf.connect.login plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:\n $i\n " >> $results
+			fi
+		done
+	}
+	
+	if [[ "$connectLicenseInstalled" != "" ]]; then
+		connectLicenseArray 
+	else
+		connectLoginLicenseArray 
+	fi
 }
+
+
 ####################################################################################################
 #Array for Jamf Protect Logs
 Protect() {
@@ -211,17 +256,6 @@ Protect() {
 Recon_Troubleshoot() {
 	mkdir -p $log_folder/Recon
 	#check for Jamf Recon leftovers
-	timefound=`grep -E -i '[0-9]+:[0-9]+' ${jamfLog} | awk '{print $4}' | tail -1`
-	echo $timefound > /dev/null
-	timeFoundNoSeconds=$(echo "${timefound:0:5}${timefound:8:3}")
-	currentTimeNoSeconds=$(echo "${currenttime1:0:5}${currenttime1:8:3}")
-	echo $timeFoundNoSeconds > /dev/null
-	echo $currentTimeNoSeconds > /dev/null
-	if [[ "$timeFoundNoSeconds" == "$currentTimeNoSeconds" ]]; then
-	echo -e "JLG appears to be running via policy, results in Recon directory may be inaccurate as files are stored there while policies are running\n" >> $results
-	else
-	echo -e "JLG appears to have been manually run. Results in Recon directory should be examined closely.\n" >> $results
-	fi
 	if [[ $reconleftovers == "" ]]; then
 		:
 	else
@@ -232,6 +266,17 @@ Recon_Troubleshoot() {
 		echo -e "\nRecon Troubleshoot found files in the /tmp directory that should not be there. A report of these files as well as next actions can be found in the Leftovers.txt file in the Recon Directory.\n" >> $results
 		#copy all files in tmp folder to recon results folder
 			cp -r /Library/Application\ Support/Jamf/tmp/ $recon/
+		timefound=`grep -E -i '[0-9]+:[0-9]+' ${jamfLog} | awk '{print $4}' | tail -1`
+		echo $timefound > /dev/null
+		timeFoundNoSeconds=$(echo "${timefound:0:5}${timefound:8:3}")
+		currentTimeNoSeconds=$(echo "${currenttime1:0:5}${currenttime1:8:3}")
+		echo $timeFoundNoSeconds > /dev/null
+		echo $currentTimeNoSeconds > /dev/null
+		if [[ "$timeFoundNoSeconds" == "$currentTimeNoSeconds" ]]; then
+			echo -e "JLG appears to be running via policy, results in Recon directory may be inaccurate as files are stored there while policies are running\n" >> $results
+		else
+			echo -e "JLG appears to have been manually run. Results in Recon directory should be examined closely.\n" >> $results
+		fi
 	fi
 }
 ####################################################################################################
@@ -396,9 +441,9 @@ Zip_Folder() {
 }
 ####################################################################################################
 # Set the Arrays you want to grab.
-# Default Array is logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+# Default Array is logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
-declare -a logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+declare -a logsToGrab=("Jamf" "Managed_Preferences" "Connect")
 
 ####################################################################################################
 # Put it all together in the Master Array
@@ -468,9 +513,9 @@ logGrabberMasterArray() {
 #Runs the Log Grabber as configured
 logGrabberMasterArray 
 #Run cleanup Array to remove empty folders
-Cleanup
+#Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
-Zip_Folder 
+#Zip_Folder 
 
 #incorporate more log show commands for Jamf binary
 #log show --style compact --predicate 'subsystem == "com.jamf.management.daemon"' --debug > ~/Desktop/test.txt
