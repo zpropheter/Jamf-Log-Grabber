@@ -193,6 +193,10 @@ Connect() {
 	connectLicenseExpiration=$(grep -A 1 "ExpirationDate" $connect/license.txt | awk '{ print $1 }' | sed 's/<string>//g' | sed 's/<.*//;/^$/d' | tr -d "-")
 	connectDateCompare=$(date +%Y%m%d)
 	
+	#REPORT JAMF CONNECT PRIVILEGE ELEVATION LOGS
+	log show --style compact --predicate '(subsystem == "com.jamf.connect.daemon") && (category == "PrivilegeElevation")' >> $connect/Connect_Daemon_Elevation_Logs.txt
+	log show --style compact --predicate '(subsystem == "com.jamf.connect") && (category == "PrivilegeElevation")' >> $connect/Connect_Menubar_Elevation_Logs.txt
+	
 	connectLicenseArray() {
 		for i in $profilesWithConnectLicense; do
 			if [[ "$i" == $connectLicenseInstalled ]]; then
@@ -443,7 +447,7 @@ Zip_Folder() {
 # Set the Arrays you want to grab.
 # Default Array is logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
-declare -a logsToGrab=("Jamf" "Managed_Preferences" "Connect")
+declare -a logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
 ####################################################################################################
 # Put it all together in the Master Array
@@ -513,9 +517,9 @@ logGrabberMasterArray() {
 #Runs the Log Grabber as configured
 logGrabberMasterArray 
 #Run cleanup Array to remove empty folders
-#Cleanup
+Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
-#Zip_Folder 
+Zip_Folder 
 
 #incorporate more log show commands for Jamf binary
 #log show --style compact --predicate 'subsystem == "com.jamf.management.daemon"' --debug > ~/Desktop/test.txt
