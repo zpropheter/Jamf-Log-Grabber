@@ -35,7 +35,7 @@
 loggedInUser=$( echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }' )
 log_folder=$HOME/Desktop/"$loggedInUser"_logs
 results=$log_folder/Results.txt
-JSS=$log_folder/JSS
+JSS=$log_folder/Client_Logs
 security=$log_folder/Jamf_Security
 connect=$log_folder/Connect
 managed_preferences=$log_folder/Managed_Preferences
@@ -77,7 +77,7 @@ CustomApp3LogSource="$9"
 ####################################################################################################
 #Array for Jamf Logs
 Jamf() {
-	mkdir -p $log_folder/JSS
+	mkdir -p $log_folder/Client_Logs
 	#ADD JAMF CLIENT LOGS TO LOG FOLDER
 	if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS
 		grep  "Error" $JSS/jamf.log > $JSS/jamferror.log
@@ -111,7 +111,7 @@ Jamf() {
 	AgentsAndDaemonsClean=$(grep -r "jamf" /Users/$loggedInUser/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/ | grep -vw "com.jamf.connect.plist" | grep -vw "com.jamf.connect.login.plist" | grep -vw "com.jamf.connect.unlock.login.plist" | grep -vw "com.jamf.management.agent.plist" | grep -vw "com.jamf.connect.daemon.plist" | grep -vw "com.jamf.management.daemon.plist" | grep -vw "com.jamfsoftware.Composer.helper.plist" | grep -vw "com.jamfsoftware.task.1.plist" | grep -vw "com.jamf.cloudmonitor.plist" | grep -vw "com.jamf.remoteassist.connect.preloginagent.plist" | grep -vw "com.jamf.remoteassist.connect.userloginagent.plist" | grep -vw "com.jamf.remoteassist.connector.plist" | grep -vw "com.jamf.management.startup.plist") 
 	case $AgentsAndDaemonsClean in
 		"")
-			echo -e "A search for custom Agents and Daemons containing 'jamf' keywords has been ran. No matches other than standard Jamf Applications were located. For thorough diagnostics a list of all Agents and Daemons containing 'jamf' keyword in JSS Folder. This includes standard Jamf Applications.\n" >> $results
+			echo -e "A search for custom Agents and Daemons containing 'jamf' keywords has been ran. No matches other than standard Jamf Applications were located. For thorough diagnostics a list of all Agents and Daemons containing 'jamf' keyword in Client_Logs Folder. This includes standard Jamf Applications.\n" >> $results
 			echo -e "$AgentsAndDaemonsDirty" > $JSS/AgentsAndDaemons.txt
 		;;
 		*)
@@ -421,7 +421,7 @@ CustomApp3Array() {
 #Array for folder cleanup
 Cleanup() {
 	#IF A VARIABLE ABOVE IS SET TO 'FALSE', REMOVE THE FOLDER NAME FOR IT BELOW TO AVOID ERRORS WITH THE CLEANUP FUNCTION AT THE END OF THE SCRIPT
-	cleanup=("JSS Recon Self_Service Connect Jamf_Security Managed_Preferences Device_Compliance JRA App_Installers $CustomApp1Name $CustomApp2Name $CustomApp3Name")
+	cleanup=("Client_Logs Recon Self_Service Connect Jamf_Security Managed_Preferences Device_Compliance JRA App_Installers $CustomApp1Name $CustomApp2Name $CustomApp3Name")
 	#CLEANS OUT EMPTY FOLDERS TO AVOID CONFUSION
 	echo "The following folders contained no files and were removed:" >> $results
 	for emptyfolder in $cleanup
@@ -496,7 +496,7 @@ logGrabberMasterArray() {
 			;;
 			"$CustomApp1Name")
 				#Add or Remove comment from line below to disable or enable the array for the custom app
-				CustomApp1Array  
+				#CustomApp1Array  
 			;;
 			"$CustomApp2Name")
 				#Add or Remove comment from line below to disable or enable the array for the custom app
