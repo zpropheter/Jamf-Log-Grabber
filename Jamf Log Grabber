@@ -31,9 +31,11 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ####################################################################################################
+#DATE FOR LOG FOLDER ZIP CREATION
+current_date=$(date +"%Y-%m-%d")
 #HARD CODED VARIABLES, DO NOT CHANGE
 loggedInUser=$( echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }' )
-log_folder=$HOME/Desktop/"$loggedInUser"_logs
+log_folder=$HOME/Desktop/"$loggedInUser"_"$current_date"_logs
 results=$log_folder/Results.txt
 JSS=$log_folder/Client_Logs
 security=$log_folder/Jamf_Security
@@ -48,8 +50,7 @@ jamfLog=$JSS/jamf.log
 
 reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
 
-#DATE FOR LOG FOLDER ZIP CREATION
-currentlogdate=$(date)
+
 
 #DATE AND TIME FOR RESULTS.TXT INFORMATION
 currenttime=$(date +"%D %T")
@@ -440,7 +441,7 @@ Cleanup() {
 Zip_Folder() {
 	cd $HOME/Desktop
 	#NAME ZIPPED FOLDER WITH LOGGED IN USER
-	zip "$loggedInUser"_logs.zip -r "$loggedInUser"_logs
+	zip "$loggedInUser"_"$current_date"_logs.zip -r "$loggedInUser"_"$current_date"_logs
 	rm -r $log_folder
 }
 ####################################################################################################
