@@ -2,7 +2,7 @@
 
 #Jamf Log Grabber is designed to collect any logs associated with Jamf Products as well as MDM Managed Preferences.
 #Jamf Products currently supported: Jamf Binary (including Recon Troubleshooting), Jamf Connect, Jamf Security (Protect and Trust), App Installers, and Jamf Remote Assist
-#Log Grabber 2.0 revamp started 11/18 to design a more easy to customize workflow for grabbing logs
+#Log Grabber 2.0 revamp started 11/18/23 to design a more easy to customize workflow for grabbing logs
 
 #Arrays are now set for each individual type of log. Simply add or remove array names to call them in the script (Line 278)
 #This new workflow allows for you to add arrays for additional in house apps like SUPER, DEPNOTIFY, Crowdstrike, or any other commonly used MacOS applications.
@@ -421,7 +421,7 @@ CustomApp3Array() {
 
 #Array for folder cleanup
 Cleanup() {
-	#IF A VARIABLE ABOVE IS SET TO 'FALSE', REMOVE THE FOLDER NAME FOR IT BELOW TO AVOID ERRORS WITH THE CLEANUP FUNCTION AT THE END OF THE SCRIPT
+	#IF AN ARRAY IS NOT SET TO RUN, REMOVE THE FOLDER NAME FOR IT BELOW TO AVOID ERRORS WITH THE CLEANUP FUNCTION AT THE END OF THE SCRIPT
 	cleanup=("Client_Logs Recon Self_Service Connect Jamf_Security Managed_Preferences Device_Compliance JRA App_Installers $CustomApp1Name $CustomApp2Name $CustomApp3Name")
 	#CLEANS OUT EMPTY FOLDERS TO AVOID CONFUSION
 	echo "The following folders contained no files and were removed:" >> $results
@@ -521,6 +521,32 @@ logGrabberMasterArray
 Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
 Zip_Folder 
+
+#Notes for future editions 
+#The primary purpose of JLG is to provide a lightweight and quick approach to collecting relevant logs for Support. Core principles for ongoing development are as follows
+# 1- Never takes more than a minute to run
+# 2- Runs in background without interruption to user
+# 3- Provides ALL relevant logs for standard troubleshooting in an I.T. or support function
+# 4.0- Is never uploaded to a device record "attachments" section in Jamf Pro (can cause performance degradation to servers long term)
+# 4.1- Never provides built in API call for such an action either 
+# 5- Easy structure to customize what logs are gathered if an Admin wishes to not collect certain items
+# 6- Follows Array structure as detailed below for future additions
+# 7- Results file should include as simple terminology as possible for easy troubleshooting reference and to provide direction for further investigation
+
+#Build Structure:
+#1. Call out standard variables as needed
+#2. Create Arrays for each individual app or category. If a new feature is released in existing categories, it will be added to that. If it is an entirely new feature set with multiple logs, a new array would be created
+#3. Run Arrays as designated in `logGrabberMasterArray`
+#4. Remove Folders with empty sets using the Cleanup Function
+#5. Zip and stamp folder with identical mame as unzipped folder
+
+#Adding a new function/array
+#1. Create a variable in the standard variable declarations
+#2. Build your function at the end of the list. Insert just above `CustomApp1Array`. Make sure to include outputs to the $results file for what the function is doing
+#3. In the cleanup function, add your folder name to the list of folders in the $cleanup variable
+#4. In $logsToGrab, add the name of your app array so that the logGrabberMasterArray knows to run it
+#5. In `logGrabberMasterArray` edit the `case` function to add a case that matches what you put in $logsToGrab and then put the name of the function to run below, it should be self explanatory as you look at the case function
+#6. Run multiple tests to confirm that the whole script runs with everything in it and confirm the results are as expected
 
 #incorporate more log show commands for Jamf binary
 #log show --style compact --predicate 'subsystem == "com.jamf.management.daemon"' --debug > ~/Desktop/test.txt
