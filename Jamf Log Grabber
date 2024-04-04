@@ -53,8 +53,11 @@ reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
 
 
 #DATE AND TIME FOR RESULTS.TXT INFORMATION
-currenttime=$(date +"%D %T")
-currenttime1=$(echo $currenttime | awk '{print $2}')
+#currenttime=$(date +"%D %T")
+currenttime() {
+	date +"%D %T"
+}
+currenttime1=$(echo "$(currenttime)" | awk '{print $2}')
 
 ####################################################################################################
 #You can add custom app log grabbing using the following rubric, just continue numbering the appnames or renaming them to fit your needs
@@ -434,7 +437,7 @@ Cleanup() {
 			:
 		fi
 	done
-	echo -e "\nCompleted Log Grabber on '$currenttime'\n" >> $results
+	echo -e "\nCompleted Log Grabber on '$(currenttime)'\n" >> $results
 }
 
 ####################################################################################################
@@ -462,7 +465,7 @@ logGrabberMasterArray() {
 	#CREATE A LOG FILE FOR SCRIPT AND SAVE TO LOGS DIRECTORY SO ADMINS CAN SEE WHAT LOGS WERE NOT GATHERED
 	touch $results
 	#SET A TIME AND DATE STAMP FOR WHEN THE LOG GRABBER WAS RAN
-	echo -e "Log Grabber was started at '$currenttime'\n" >> $results
+	echo -e "Log Grabber was started at '$(currenttime)'\n" >> $results
 	## now loop through the above array
 	for logs in "${logsToGrab[@]}"
 	do
