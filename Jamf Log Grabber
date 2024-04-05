@@ -2,7 +2,7 @@
 
 #Jamf Log Grabber is designed to collect any logs associated with Jamf Products as well as MDM Managed Preferences.
 #Jamf Products currently supported: Jamf Binary (including Recon Troubleshooting), Jamf Connect, Jamf Security (Protect and Trust), App Installers, and Jamf Remote Assist
-#Log Grabber 2.0 revamp started 11/18 to design a more easy to customize workflow for grabbing logs
+#Log Grabber 2.0 revamp started 11/18/23 to design a more easy to customize workflow for grabbing logs
 
 #Arrays are now set for each individual type of log. Simply add or remove array names to call them in the script (Line 278)
 #This new workflow allows for you to add arrays for additional in house apps like SUPER, DEPNOTIFY, Crowdstrike, or any other commonly used MacOS applications.
@@ -31,11 +31,13 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ####################################################################################################
+#DATE FOR LOG FOLDER ZIP CREATION
+current_date=$(date +"%Y-%m-%d")
 #HARD CODED VARIABLES, DO NOT CHANGE
 loggedInUser=$( echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }' )
-log_folder=$HOME/Desktop/"$loggedInUser"_logs
+log_folder=$HOME/Desktop/"$loggedInUser"_"$current_date"_logs
 results=$log_folder/Results.txt
-JSS=$log_folder/JSS
+JSS=$log_folder/Client_Logs
 security=$log_folder/Jamf_Security
 connect=$log_folder/Connect
 managed_preferences=$log_folder/Managed_Preferences
@@ -48,12 +50,14 @@ jamfLog=$JSS/jamf.log
 
 reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
 
-#DATE FOR LOG FOLDER ZIP CREATION
-currentlogdate=$(date)
+
 
 #DATE AND TIME FOR RESULTS.TXT INFORMATION
-currenttime=$(date +"%D %T")
-currenttime1=$(echo $currenttime | awk '{print $2}')
+#currenttime=$(date +"%D %T")
+currenttime() {
+	date +"%D %T"
+}
+currenttime1=$(echo "$(currenttime)" | awk '{print $2}')
 
 ####################################################################################################
 #You can add custom app log grabbing using the following rubric, just continue numbering the appnames or renaming them to fit your needs
@@ -77,7 +81,7 @@ CustomApp3LogSource="$9"
 ####################################################################################################
 #Array for Jamf Logs
 Jamf() {
-	mkdir -p $log_folder/JSS
+	mkdir -p $log_folder/Client_Logs
 	#ADD JAMF CLIENT LOGS TO LOG FOLDER
 	if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS
 		grep  "Error" $JSS/jamf.log > $JSS/jamferror.log
@@ -111,7 +115,7 @@ Jamf() {
 	AgentsAndDaemonsClean=$(grep -r "jamf" /Users/$loggedInUser/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/ | grep -vw "com.jamf.connect.plist" | grep -vw "com.jamf.connect.login.plist" | grep -vw "com.jamf.connect.unlock.login.plist" | grep -vw "com.jamf.management.agent.plist" | grep -vw "com.jamf.connect.daemon.plist" | grep -vw "com.jamf.management.daemon.plist" | grep -vw "com.jamfsoftware.Composer.helper.plist" | grep -vw "com.jamfsoftware.task.1.plist" | grep -vw "com.jamf.cloudmonitor.plist" | grep -vw "com.jamf.remoteassist.connect.preloginagent.plist" | grep -vw "com.jamf.remoteassist.connect.userloginagent.plist" | grep -vw "com.jamf.remoteassist.connector.plist" | grep -vw "com.jamf.management.startup.plist") 
 	case $AgentsAndDaemonsClean in
 		"")
-			echo -e "A search for custom Agents and Daemons containing 'jamf' keywords has been ran. No matches other than standard Jamf Applications were located. For thorough diagnostics a list of all Agents and Daemons containing 'jamf' keyword in JSS Folder. This includes standard Jamf Applications.\n" >> $results
+			echo -e "A search for custom Agents and Daemons containing 'jamf' keywords has been ran. No matches other than standard Jamf Applications were located. For thorough diagnostics a list of all Agents and Daemons containing 'jamf' keyword in Client_Logs Folder. This includes standard Jamf Applications.\n" >> $results
 			echo -e "$AgentsAndDaemonsDirty" > $JSS/AgentsAndDaemons.txt
 		;;
 		*)
@@ -123,6 +127,7 @@ Jamf() {
 	#show installed profiles and output to xml. Use this to compare profile settings against actual settings in Managed Preferences Folder
 	sudo profiles show -output $JSS/profiles.xml stdout-xml	
 }
+
 
 ####################################################################################################
 #Array for Jamf Connect Logs
@@ -185,7 +190,55 @@ Connect() {
 	else
 		echo -e "-No Jamf Connect Installed, doing nothing\n" >> $results
 	fi
+	#CHECK THE JAMF CONNECT LICENSE FILE AND LOOK FOR OTHER PROFILES THAT MAY HAVE A JAMF CONNECT LICENSE
+	connectLicenseInstalled=$(defaults read $managed_preferences/com.jamf.connect.plist LicenseFile)
+	connectLoginLicenseInstalled=$(defaults read /Users/zach.propheter/Desktop/zach.propheter_logs/Managed_Preferences/zach.propheter/com.jamf.connect.login.plist LicenseFile)
+	profilesWithConnectLicense=$(grep -A 1 "LicenseFile" $JSS/profiles.xml | awk -F'<string>' '{print $2}' | sed 's/string>//g' | sed 's/<.*//;/^$/d')
+	connectLicenseExpiration=$(grep -A 1 "ExpirationDate" $connect/license.txt | awk '{ print $1 }' | sed 's/<string>//g' | sed 's/<.*//;/^$/d' | tr -d "-")
+	connectDateCompare=$(date +%Y%m%d)
+	
+	#REPORT JAMF CONNECT PRIVILEGE ELEVATION LOGS
+	log show --style compact --predicate '(subsystem == "com.jamf.connect.daemon") && (category == "PrivilegeElevation")' >> $connect/Connect_Daemon_Elevation_Logs.txt
+	log show --style compact --predicate '(subsystem == "com.jamf.connect") && (category == "PrivilegeElevation")' >> $connect/Connect_Menubar_Elevation_Logs.txt
+	
+	connectLicenseArray() {
+		for i in $profilesWithConnectLicense; do
+			if [[ "$i" == $connectLicenseInstalled ]]; then
+				echo -e "-Matching Profile found for installed Connect License (com.jamf.connect)." >> $results
+				if [ $connectDateCompare -ge $connectLicenseExpiration ]; then
+					echo "-Currently installed Jamf Connect License is expired" >> $results
+				else
+					echo "-Currently installed Jamf Connect License is valid" >> $results
+				fi
+			else
+				echo -e "-Mismatch between installed Connect license found in com.jamf.connect plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:\n $i\n " >> $results
+			fi
+		done
+	}
+	
+	connectLoginLicenseArray() {
+		for i in $profilesWithConnectLicense; do
+			if [[ "$i" == $connectLoginLicenseInstalled ]]; then
+				echo -e "-Matching Profile found for installed Connect License (com.jamf.connect.login)." >> $results
+				if [ $connectDateCompare -ge $connectLicenseExpiration ]; then
+					echo "-Currently installed Jamf Connect License is expired" >> $results
+				else
+					echo "-Currently installed Jamf Connect License is valid" >> $results
+				fi
+			else
+				echo -e "-Mismatch between installed Connect license found in com.jamf.connect.login plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:\n $i\n " >> $results
+			fi
+		done
+	}
+	
+	if [[ "$connectLicenseInstalled" != "" ]]; then
+		connectLicenseArray 
+	else
+		connectLoginLicenseArray 
+	fi
 }
+
+
 ####################################################################################################
 #Array for Jamf Protect Logs
 Protect() {
@@ -211,17 +264,6 @@ Protect() {
 Recon_Troubleshoot() {
 	mkdir -p $log_folder/Recon
 	#check for Jamf Recon leftovers
-	timefound=`grep -E -i '[0-9]+:[0-9]+' ${jamfLog} | awk '{print $4}' | tail -1`
-	echo $timefound > /dev/null
-	timeFoundNoSeconds=$(echo "${timefound:0:5}${timefound:8:3}")
-	currentTimeNoSeconds=$(echo "${currenttime1:0:5}${currenttime1:8:3}")
-	echo $timeFoundNoSeconds > /dev/null
-	echo $currentTimeNoSeconds > /dev/null
-	if [[ "$timeFoundNoSeconds" == "$currentTimeNoSeconds" ]]; then
-	echo -e "JLG appears to be running via policy, results in Recon directory may be inaccurate as files are stored there while policies are running\n" >> $results
-	else
-	echo -e "JLG appears to have been manually run. Results in Recon directory should be examined closely.\n" >> $results
-	fi
 	if [[ $reconleftovers == "" ]]; then
 		:
 	else
@@ -232,6 +274,17 @@ Recon_Troubleshoot() {
 		echo -e "\nRecon Troubleshoot found files in the /tmp directory that should not be there. A report of these files as well as next actions can be found in the Leftovers.txt file in the Recon Directory.\n" >> $results
 		#copy all files in tmp folder to recon results folder
 			cp -r /Library/Application\ Support/Jamf/tmp/ $recon/
+		timefound=`grep -E -i '[0-9]+:[0-9]+' ${jamfLog} | awk '{print $4}' | tail -1`
+		echo $timefound > /dev/null
+		timeFoundNoSeconds=$(echo "${timefound:0:5}${timefound:8:3}")
+		currentTimeNoSeconds=$(echo "${currenttime1:0:5}${currenttime1:8:3}")
+		echo $timeFoundNoSeconds > /dev/null
+		echo $currentTimeNoSeconds > /dev/null
+		if [[ "$timeFoundNoSeconds" == "$currentTimeNoSeconds" ]]; then
+			echo -e "JLG appears to be running via policy, results in Recon directory may be inaccurate as files are stored there while policies are running\n" >> $results
+		else
+			echo -e "JLG appears to have been manually run. Results in Recon directory should be examined closely.\n" >> $results
+		fi
 	fi
 }
 ####################################################################################################
@@ -371,8 +424,8 @@ CustomApp3Array() {
 
 #Array for folder cleanup
 Cleanup() {
-	#IF A VARIABLE ABOVE IS SET TO 'FALSE', REMOVE THE FOLDER NAME FOR IT BELOW TO AVOID ERRORS WITH THE CLEANUP FUNCTION AT THE END OF THE SCRIPT
-	cleanup=("JSS Recon Self_Service Connect Jamf_Security Managed_Preferences Device_Compliance JRA App_Installers $CustomApp1Name $CustomApp2Name $CustomApp3Name")
+	#IF AN ARRAY IS NOT SET TO RUN, REMOVE THE FOLDER NAME FOR IT BELOW TO AVOID ERRORS WITH THE CLEANUP FUNCTION AT THE END OF THE SCRIPT
+	cleanup=("Client_Logs Recon Self_Service Connect Jamf_Security Managed_Preferences Device_Compliance JRA App_Installers $CustomApp1Name $CustomApp2Name $CustomApp3Name")
 	#CLEANS OUT EMPTY FOLDERS TO AVOID CONFUSION
 	echo "The following folders contained no files and were removed:" >> $results
 	for emptyfolder in $cleanup
@@ -384,21 +437,21 @@ Cleanup() {
 			:
 		fi
 	done
-	echo -e "\nCompleted Log Grabber on '$currenttime'\n" >> $results
+	echo -e "\nCompleted Log Grabber on '$(currenttime)'\n" >> $results
 }
 
 ####################################################################################################
 Zip_Folder() {
 	cd $HOME/Desktop
 	#NAME ZIPPED FOLDER WITH LOGGED IN USER
-	zip "$loggedInUser"_logs.zip -r "$loggedInUser"_logs
+	zip "$loggedInUser"_"$current_date"_logs.zip -r "$loggedInUser"_"$current_date"_logs
 	rm -r $log_folder
 }
 ####################################################################################################
 # Set the Arrays you want to grab.
-# Default Array is logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+# Default Array is logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
-declare -a logsToGrab=("Jamf" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check" "Managed_Preferences" "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+declare -a logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
 ####################################################################################################
 # Put it all together in the Master Array
@@ -412,7 +465,7 @@ logGrabberMasterArray() {
 	#CREATE A LOG FILE FOR SCRIPT AND SAVE TO LOGS DIRECTORY SO ADMINS CAN SEE WHAT LOGS WERE NOT GATHERED
 	touch $results
 	#SET A TIME AND DATE STAMP FOR WHEN THE LOG GRABBER WAS RAN
-	echo -e "Log Grabber was started at '$currenttime'\n" >> $results
+	echo -e "Log Grabber was started at '$(currenttime)'\n" >> $results
 	## now loop through the above array
 	for logs in "${logsToGrab[@]}"
 	do
@@ -447,7 +500,7 @@ logGrabberMasterArray() {
 			;;
 			"$CustomApp1Name")
 				#Add or Remove comment from line below to disable or enable the array for the custom app
-				CustomApp1Array  
+				#CustomApp1Array  
 			;;
 			"$CustomApp2Name")
 				#Add or Remove comment from line below to disable or enable the array for the custom app
@@ -471,6 +524,32 @@ logGrabberMasterArray
 Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
 Zip_Folder 
+
+#Notes for future editions 
+#The primary purpose of JLG is to provide a lightweight and quick approach to collecting relevant logs for Support. Core principles for ongoing development are as follows
+# 1- Never takes more than a minute to run
+# 2- Runs in background without interruption to user
+# 3- Provides ALL relevant logs for standard troubleshooting in an I.T. or support function
+# 4.0- Is never uploaded to a device record "attachments" section in Jamf Pro (can cause performance degradation to servers long term)
+# 4.1- Never provides built in API call for such an action either 
+# 5- Easy structure to customize what logs are gathered if an Admin wishes to not collect certain items
+# 6- Follows Array structure as detailed below for future additions
+# 7- Results file should include as simple terminology as possible for easy troubleshooting reference and to provide direction for further investigation
+
+#Build Structure:
+#1. Call out standard variables as needed
+#2. Create Arrays for each individual app or category. If a new feature is released in existing categories, it will be added to that. If it is an entirely new feature set with multiple logs, a new array would be created
+#3. Run Arrays as designated in `logGrabberMasterArray`
+#4. Remove Folders with empty sets using the Cleanup Function
+#5. Zip and stamp folder with identical mame as unzipped folder
+
+#Adding a new function/array
+#1. Create a variable in the standard variable declarations
+#2. Build your function at the end of the list. Insert just above `CustomApp1Array`. Make sure to include outputs to the $results file for what the function is doing
+#3. In the cleanup function, add your folder name to the list of folders in the $cleanup variable
+#4. In $logsToGrab, add the name of your app array so that the logGrabberMasterArray knows to run it
+#5. In `logGrabberMasterArray` edit the `case` function to add a case that matches what you put in $logsToGrab and then put the name of the function to run below, it should be self explanatory as you look at the case function
+#6. Run multiple tests to confirm that the whole script runs with everything in it and confirm the results are as expected
 
 #incorporate more log show commands for Jamf binary
 #log show --style compact --predicate 'subsystem == "com.jamf.management.daemon"' --debug > ~/Desktop/test.txt
