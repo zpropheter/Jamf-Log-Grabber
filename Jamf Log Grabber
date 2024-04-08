@@ -82,6 +82,8 @@ CustomApp3LogSource="$9"
 #Array for Jamf Logs
 Jamf() {
 	mkdir -p $log_folder/Client_Logs
+	#GET SYSTEM PROFILE REPORT- This spits out a couple errors due to KEXT stuff that's deprecated
+	system_profiler -xml > $JSS/SystemReport.spx 2>/dev/null
 	#ADD JAMF CLIENT LOGS TO LOG FOLDER
 	if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS
 		grep  "Error" $JSS/jamf.log > $JSS/jamferror.log
