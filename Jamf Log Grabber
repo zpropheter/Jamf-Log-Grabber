@@ -128,6 +128,11 @@ Jamf() {
 	sudo cat /Library/Application\ Support/JAMF/.jmf_settings.json > $JSS/restricted_software.json
 	#show installed profiles and output to xml. Use this to compare profile settings against actual settings in Managed Preferences Folder
 	sudo profiles show -output $JSS/profiles.xml stdout-xml	
+	/usr/libexec/mdmclient AvailableOSUpdates > $JSS/AvailableOSUpdates.txt
+	/usr/libexec/mdmclient QueryDeviceInformation > $JSS/QueryDeviceInformation.txt
+	/usr/libexec/mdmclient QueryInstalledProfiles > $JSS/QueryInstalledProfiles.txt
+	/usr/libexec/mdmclient QueryInstalledApps > $JSS/QueryInstalledApps.txt
+	/usr/libexec/mdmclient DumpManagementStatus > $JSS/DumpManagementStatus.txt
 }
 
 
