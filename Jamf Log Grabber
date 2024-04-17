@@ -197,7 +197,7 @@ Connect() {
 	fi
 	#CHECK THE JAMF CONNECT LICENSE FILE AND LOOK FOR OTHER PROFILES THAT MAY HAVE A JAMF CONNECT LICENSE
 	connectLicenseInstalled=$(defaults read $managed_preferences/com.jamf.connect.plist LicenseFile)
-	connectLoginLicenseInstalled=$(defaults read /Users/zach.propheter/Desktop/zach.propheter_logs/Managed_Preferences/zach.propheter/com.jamf.connect.login.plist LicenseFile)
+	connectLoginLicenseInstalled=$(defaults read $managed_preferences/com.jamf.connect.login.plist LicenseFile)
 	profilesWithConnectLicense=$(grep -A 1 "LicenseFile" $JSS/profiles.xml | awk -F'<string>' '{print $2}' | sed 's/string>//g' | sed 's/<.*//;/^$/d')
 	connectLicenseExpiration=$(grep -A 1 "ExpirationDate" $connect/license.txt | awk '{ print $1 }' | sed 's/<string>//g' | sed 's/<.*//;/^$/d' | tr -d "-")
 	connectDateCompare=$(date +%Y%m%d)
@@ -207,41 +207,45 @@ Connect() {
 	log show --style compact --predicate '(subsystem == "com.jamf.connect") && (category == "PrivilegeElevation")' >> $connect/Connect_Menubar_Elevation_Logs.txt
 	
 	connectLicenseArray() {
+		if [[ "$connectLicenseInstalled" == "" ]]; then
+			echo -e "No License found for com.jamf.connect\n" >> $results
+		else
 		for i in $profilesWithConnectLicense; do
 			if [[ "$i" == $connectLicenseInstalled ]]; then
-				echo -e "-Matching Profile found for installed Connect License (com.jamf.connect)." >> $results
+				echo -e "--Matching Profile found for installed Connect License (com.jamf.connect)." >> $results
 				if [ $connectDateCompare -ge $connectLicenseExpiration ]; then
-					echo "-Currently installed Jamf Connect License is expired" >> $results
+					echo "--Currently installed Jamf Connect License is expired" >> $results
 				else
-					echo "-Currently installed Jamf Connect License is valid" >> $results
+					echo "--Currently installed Jamf Connect License is valid" >> $results
 				fi
 			else
-				echo -e "-Mismatch between installed Connect license found in com.jamf.connect plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:\n $i\n " >> $results
+				echo -e "--Mismatch between installed Connect license found in com.jamf.connect plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:\n $i\n " >> $results
 			fi
 		done
+		fi
 	}
 	
 	connectLoginLicenseArray() {
+		if [[ "$connectLoginLicenseInstalled" == "" ]]; then
+			echo -e "-No License found for com.jamf.connect.login\n" >> $results
+		else
 		for i in $profilesWithConnectLicense; do
 			if [[ "$i" == $connectLoginLicenseInstalled ]]; then
 				echo -e "-Matching Profile found for installed Connect License (com.jamf.connect.login)." >> $results
 				if [ $connectDateCompare -ge $connectLicenseExpiration ]; then
-					echo "-Currently installed Jamf Connect License is expired" >> $results
+					echo "--Currently installed Jamf Connect License is expired" >> $results
 				else
-					echo "-Currently installed Jamf Connect License is valid" >> $results
+					echo "--Currently installed Jamf Connect License is valid" >> $results
 				fi
 			else
-				echo -e "-Mismatch between installed Connect license found in com.jamf.connect.login plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:\n $i\n " >> $results
+				echo -e "--Mismatch between installed Connect license found in com.jamf.connect.login plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:\n $i\n " >> $results
 			fi
-		done
+		done	
+		fi
 	}
-	
-	if [[ "$connectLicenseInstalled" != "" ]]; then
 		connectLicenseArray 
-	else
 		connectLoginLicenseArray 
-	fi
-}
+	}
 
 
 ####################################################################################################
@@ -456,7 +460,7 @@ Zip_Folder() {
 # Set the Arrays you want to grab.
 # Default Array is logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
-declare -a logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+declare -a logsToGrab=("Jamf" "Managed_Preferences" "Connect")
 
 ####################################################################################################
 # Put it all together in the Master Array
@@ -528,7 +532,7 @@ logGrabberMasterArray
 #Run cleanup Array to remove empty folders
 Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
-Zip_Folder 
+#Zip_Folder 
 
 #Notes for future editions 
 #The primary purpose of JLG is to provide a lightweight and quick approach to collecting relevant logs for Support. Core principles for ongoing development are as follows
