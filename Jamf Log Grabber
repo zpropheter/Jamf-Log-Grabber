@@ -460,7 +460,7 @@ Zip_Folder() {
 # Set the Arrays you want to grab.
 # Default Array is logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
-declare -a logsToGrab=("Jamf" "Managed_Preferences" "Connect")
+declare -a logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
 ####################################################################################################
 # Put it all together in the Master Array
@@ -532,7 +532,7 @@ logGrabberMasterArray
 #Run cleanup Array to remove empty folders
 Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
-#Zip_Folder 
+Zip_Folder 
 
 #Notes for future editions 
 #The primary purpose of JLG is to provide a lightweight and quick approach to collecting relevant logs for Support. Core principles for ongoing development are as follows
