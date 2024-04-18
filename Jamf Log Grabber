@@ -82,6 +82,8 @@ CustomApp3LogSource="$9"
 #Array for Jamf Logs
 Jamf() {
 	mkdir -p $log_folder/Client_Logs
+	#GET SYSTEM PROFILE REPORT- This spits out a couple errors due to KEXT stuff that's deprecated
+	system_profiler -xml > $JSS/SystemReport.spx 2>/dev/null
 	#ADD JAMF CLIENT LOGS TO LOG FOLDER
 	if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS
 		grep  "Error" $JSS/jamf.log > $JSS/jamferror.log
@@ -126,6 +128,9 @@ Jamf() {
 	sudo cat /Library/Application\ Support/JAMF/.jmf_settings.json > $JSS/restricted_software.json
 	#show installed profiles and output to xml. Use this to compare profile settings against actual settings in Managed Preferences Folder
 	sudo profiles show -output $JSS/profiles.xml stdout-xml	
+	/usr/libexec/mdmclient AvailableOSUpdates > $JSS/AvailableOSUpdates.txt
+	/usr/libexec/mdmclient QueryDeviceInformation > $JSS/QueryDeviceInformation.txt
+	/usr/libexec/mdmclient DumpManagementStatus > $JSS/DumpManagementStatus.txt
 }
 
 
@@ -192,7 +197,7 @@ Connect() {
 	fi
 	#CHECK THE JAMF CONNECT LICENSE FILE AND LOOK FOR OTHER PROFILES THAT MAY HAVE A JAMF CONNECT LICENSE
 	connectLicenseInstalled=$(defaults read $managed_preferences/com.jamf.connect.plist LicenseFile)
-	connectLoginLicenseInstalled=$(defaults read /Users/zach.propheter/Desktop/zach.propheter_logs/Managed_Preferences/zach.propheter/com.jamf.connect.login.plist LicenseFile)
+	connectLoginLicenseInstalled=$(defaults read $managed_preferences/com.jamf.connect.login.plist LicenseFile)
 	profilesWithConnectLicense=$(grep -A 1 "LicenseFile" $JSS/profiles.xml | awk -F'<string>' '{print $2}' | sed 's/string>//g' | sed 's/<.*//;/^$/d')
 	connectLicenseExpiration=$(grep -A 1 "ExpirationDate" $connect/license.txt | awk '{ print $1 }' | sed 's/<string>//g' | sed 's/<.*//;/^$/d' | tr -d "-")
 	connectDateCompare=$(date +%Y%m%d)
@@ -202,41 +207,45 @@ Connect() {
 	log show --style compact --predicate '(subsystem == "com.jamf.connect") && (category == "PrivilegeElevation")' >> $connect/Connect_Menubar_Elevation_Logs.txt
 	
 	connectLicenseArray() {
+		if [[ "$connectLicenseInstalled" == "" ]]; then
+			echo -e "No License found for com.jamf.connect\n" >> $results
+		else
 		for i in $profilesWithConnectLicense; do
 			if [[ "$i" == $connectLicenseInstalled ]]; then
-				echo -e "-Matching Profile found for installed Connect License (com.jamf.connect)." >> $results
+				echo -e "--Matching Profile found for installed Connect License (com.jamf.connect)." >> $results
 				if [ $connectDateCompare -ge $connectLicenseExpiration ]; then
-					echo "-Currently installed Jamf Connect License is expired" >> $results
+					echo "--Currently installed Jamf Connect License is expired" >> $results
 				else
-					echo "-Currently installed Jamf Connect License is valid" >> $results
+					echo "--Currently installed Jamf Connect License is valid" >> $results
 				fi
 			else
-				echo -e "-Mismatch between installed Connect license found in com.jamf.connect plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:\n $i\n " >> $results
+				echo -e "--Mismatch between installed Connect license found in com.jamf.connect plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:\n $i\n " >> $results
 			fi
 		done
+		fi
 	}
 	
 	connectLoginLicenseArray() {
+		if [[ "$connectLoginLicenseInstalled" == "" ]]; then
+			echo -e "-No License found for com.jamf.connect.login\n" >> $results
+		else
 		for i in $profilesWithConnectLicense; do
 			if [[ "$i" == $connectLoginLicenseInstalled ]]; then
 				echo -e "-Matching Profile found for installed Connect License (com.jamf.connect.login)." >> $results
 				if [ $connectDateCompare -ge $connectLicenseExpiration ]; then
-					echo "-Currently installed Jamf Connect License is expired" >> $results
+					echo "--Currently installed Jamf Connect License is expired" >> $results
 				else
-					echo "-Currently installed Jamf Connect License is valid" >> $results
+					echo "--Currently installed Jamf Connect License is valid" >> $results
 				fi
 			else
-				echo -e "-Mismatch between installed Connect license found in com.jamf.connect.login plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:\n $i\n " >> $results
+				echo -e "--Mismatch between installed Connect license found in com.jamf.connect.login plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:\n $i\n " >> $results
 			fi
-		done
+		done	
+		fi
 	}
-	
-	if [[ "$connectLicenseInstalled" != "" ]]; then
 		connectLicenseArray 
-	else
 		connectLoginLicenseArray 
-	fi
-}
+	}
 
 
 ####################################################################################################
