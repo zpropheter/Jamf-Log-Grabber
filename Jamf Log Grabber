@@ -587,7 +587,7 @@ logGrabberMasterArray() {
 logGrabberMasterArray 
 #Run cleanup Array to remove empty folders
 Cleanup
-#Zips Results- Comment out or remove the line below to leave the folder unzipped
+Zips Results- Comment out or remove the line below to leave the folder unzipped
 #Zip_Folder 
 
 #Notes for future editions 
