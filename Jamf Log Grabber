@@ -254,11 +254,11 @@ Connect() {
 		else
 			for i in $profilesWithConnectLicense; do
 				if [[ "$i" == $connectLicenseInstalled ]]; then
-					printf '<code style="color: %s;">%s<br></code>' "green" "--Matching Profile found for installed Connect License (com.jamf.connect)." >> $results
+					printf '<code style="color: %s;">%s<br></code>' "lime" "--Matching Profile found for installed Connect License (com.jamf.connect)." >> $results
 					if [ $connectDateCompare -ge $connectLicenseExpiration ]; then
-						printf '<code style="color: %s;">%s<br></code>' "red" "--Currently installed Jamf Connect License is expired" >> $results
+						printf '<code style="color: %s;">%s<br></code>' "red" "--Currently installed Jamf Connect License is expired." >> $results
 					else
-						printf '<code style="color: %s;">%s<br></code>' "green" "--Currently installed Jamf Connect License is valid" >> $results
+						printf '<code style="color: %s;">%s<br></code>' "lime" "--Currently installed Jamf Connect License is valid." >> $results
 					fi
 				else
 					printf '<code style="color: %s;">%s<br></code>' "red" "--Mismatch between installed Connect license found in com.jamf.connect.login plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:<br>"
@@ -274,11 +274,11 @@ Connect() {
 		else
 			for i in $profilesWithConnectLicense; do
 				if [[ "$i" == $connectLoginLicenseInstalled ]]; then
-					printf '<code style="color: %s;">%s<br></code>' "green" "--Matching Profile found for installed Connect License (com.jamf.connect.login)." >> $results
+					printf '<code style="color: %s;">%s<br></code>' "lime" "--Matching Profile found for installed Connect License (com.jamf.connect.login)." >> $results
 					if [ $connectDateCompare -ge $connectLicenseExpiration ]; then
-						printf '<code style="color: %s;">%s<br></code>' "red" "--Currently installed Jamf Connect License is expired" >> $results
+						printf '<code style="color: %s;">%s<br></code>' "red" "--Currently installed Jamf Connect License is expired." >> $results
 					else
-						printf '<code style="color: %s;">%s<br></code>' "green" "--Currently installed Jamf Connect License is valid" >> $results
+						printf '<code style="color: %s;">%s<br></code>' "lime" "--Currently installed Jamf Connect License is valid." >> $results
 					fi
 				else
 					printf '<code style="color: %s;">%s<br></code>' "red" "--Mismatch between installed Connect license found in com.jamf.connect.login plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:<br>"
@@ -587,8 +587,8 @@ logGrabberMasterArray() {
 logGrabberMasterArray 
 #Run cleanup Array to remove empty folders
 Cleanup
-Zips Results- Comment out or remove the line below to leave the folder unzipped
-#Zip_Folder 
+#Zips Results- Comment out or remove the line below to leave the folder unzipped
+Zip_Folder 
 
 #Notes for future editions 
 #The primary purpose of JLG is to provide a lightweight and quick approach to collecting relevant logs for Support. Core principles for ongoing development are as follows
