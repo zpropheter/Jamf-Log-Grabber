@@ -4,7 +4,7 @@
 #Jamf Products currently supported: Jamf Binary (including Recon Troubleshooting), Jamf Connect, Jamf Security (Protect and Trust), App Installers, and Jamf Remote Assist
 #Log Grabber 2.0 revamp started 11/18/23 to design a more easy to customize workflow for grabbing logs
 
-#Arrays are now set for each individual type of log. Simply add or remove array names to call them in the script (Line 278)
+#Arrays are now set for each individual type of log. Simply add or remove array names to call them in the script (Line 518)
 #This new workflow allows for you to add arrays for additional in house apps like SUPER, DEPNOTIFY, Crowdstrike, or any other commonly used MacOS applications.
 
 ####################################################################################################
@@ -452,10 +452,10 @@ AppInstallers() {
 #When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
 CustomApp1Array() {
 	mkdir -p $log_folder/$CustomApp1Name
-	if [ -e $CustomApp1LogSource ]; then cp $CustomApp1LogSource $CustomApp1Folder
+	if [ -e $CustomApp1LogSource ] && [ $CustomApp1LogSource != "/" ]; then cp -r $CustomApp1LogSource $CustomApp1Folder
 	else
 		printf '<h2>'$CustomApp1Name'</h2>' >> $results
-		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp1Name does not have a log file available to grab." >> $results
+		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp1Name does not have a log file available to grab or was set to an invalid path." >> $results
 	fi
 }
 
@@ -464,10 +464,10 @@ CustomApp1Array() {
 #When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
 CustomApp2Array() {
 	mkdir -p $log_folder/$CustomApp2Name
-	if [ -e $CustomApp2LogSource ]; then cp $CustomApp2LogSource $CustomApp2Folder
+	if [ -e $CustomApp2LogSource ] && [ $CustomApp2LogSource != "/" ]; then cp -r $CustomApp2LogSource $CustomApp2Folder
 	else
 		printf '<h2>'$CustomApp2Name'</h2>' >> $results
-		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp2Name does not have a log file available to grab." >> $results
+		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp2Name does not have a log file available to grab or was set to an invalid path." >> $results
 	fi
 }
 
@@ -476,10 +476,10 @@ CustomApp2Array() {
 #When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
 CustomApp3Array() {
 	mkdir -p $log_folder/$CustomApp3Name
-	if [ -e $CustomApp3LogSource ]; then cp $CustomApp3LogSource $CustomApp3Folder
+	if [ -e $CustomApp3LogSource ] && [ $CustomApp3LogSource != "/" ]; then cp -r $CustomApp3LogSource $CustomApp3Folder
 	else
 		printf '<h2>'$CustomApp3Name'</h2>' >> $results
-		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp3Name does not have a log file available to grab." >> $results
+		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp3Name does not have a log file available to grab or was set to an invalid path." >> $results
 	fi
 }
 
