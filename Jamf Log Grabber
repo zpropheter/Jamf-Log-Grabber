@@ -271,7 +271,7 @@ Connect() {
 	
 	connectLoginLicenseArray() {
 		if [[ "$connectLoginLicenseInstalled" == "" ]]; then
-			printf '<code style="color: %s;">%s<br></code>' "white" "--No License found for com.jamf.connect.login" >> $results
+			printf '<code style="color: %s;">%s<br></code>' "red" "No License found for com.jamf.connect.login" >> $results
 		else
 			for i in $profilesWithConnectLicense; do
 				if [[ "$i" == $connectLoginLicenseInstalled ]]; then
