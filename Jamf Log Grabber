@@ -1,10 +1,12 @@
 #!/bin/bash
 
+#!/bin/bash
+
 #Jamf Log Grabber is designed to collect any logs associated with Jamf Products as well as MDM Managed Preferences.
 #Jamf Products currently supported: Jamf Binary (including Recon Troubleshooting), Jamf Connect, Jamf Security (Protect and Trust), App Installers, and Jamf Remote Assist
 #Log Grabber 2.0 revamp started 11/18/23 to design a more easy to customize workflow for grabbing logs
 
-#Arrays are now set for each individual type of log. Simply add or remove array names to call them in the script (Line 518)
+#Arrays are now set for each individual type of log. Simply add or remove array names to call them in the script (Line 278)
 #This new workflow allows for you to add arrays for additional in house apps like SUPER, DEPNOTIFY, Crowdstrike, or any other commonly used MacOS applications.
 
 ####################################################################################################
@@ -57,6 +59,7 @@ App_Installers=$log_folder/App_Installers
 jamfLog=$JSS/jamf.log
 
 reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
+protectDiagnostics=$(ls "$HOME/Desktop/" | grep "JamfProtectDiagnostics")
 
 
 
@@ -87,7 +90,7 @@ CustomApp3LogSource="$9"
 
 #Build a results file in HTML
 buildHTMLResults() {
-printf '<html>
+	printf '<html>
 	<head>  
 		<style type="text/css">
 			body { background-color:#444444;font-family:Helvetica,Arial,sans-serif;margin:20px; }
@@ -297,12 +300,18 @@ Connect() {
 Protect() {
 	#MAKE DIRECTORY FOR ALL JAMF SECURITY RELATED FILES
 	mkdir -p $log_folder/Jamf_Security
+	printf '<h2>Jamf Protect</h2>' >> $results
+	#CHECK FOR JAMF PROTECT DIAGNOSTICS FOLDER, THEN COPY IF PRESENT
+	if [ $protectDiagnostics != "" ]; then cp -r "$HOME/Desktop/$protectDiagnostics" "$security"
+		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been ran in the last 24 hours on this device." >> $results
+	fi
 	#CHECK FOR JAMF PROTECT PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
 	if [ -e /Library/Managed\ Preferences/com.jamf.protect.plist ]; then cp "/Library/Managed Preferences/com.jamf.protect.plist" "$security/com.jamf.protect.plist"
+		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Protect plist found" >> $results
 		plutil -convert xml1 "$security/com.jamf.protect.plist"
 		protectctl info > $security/jamfprotectinfo.log
+		
 	else
-		printf '<h2>Jamf Protect</h2>' >> $results
 		printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Protect plist not found" >> $results
 	fi
 	#CHECK FOR JAMF TRUST PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
@@ -501,7 +510,7 @@ Cleanup() {
 			:
 		fi
 	done
-printf '<code style="color: %s;">%s<br></code>' "white" "Completed Log Grabber on '$(currenttime)'" >> $results
+	printf '<code style="color: %s;">%s<br></code>' "white" "Completed Log Grabber on '$(currenttime)'" >> $results
 }
 
 ####################################################################################################
@@ -590,23 +599,6 @@ Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
 Zip_Folder 
 
-#Notes for future editions 
-#The primary purpose of JLG is to provide a lightweight and quick approach to collecting relevant logs for Support. Core principles for ongoing development are as follows
-# 1- Never takes more than a minute to run
-# 2- Runs in background without interruption to user
-# 3- Provides ALL relevant logs for standard troubleshooting in an I.T. or support function
-# 4.0- Is never uploaded to a device record "attachments" section in Jamf Pro (can cause performance degradation to servers long term)
-# 4.1- Never provides built in API call for such an action either 
-# 5- Easy structure to customize what logs are gathered if an Admin wishes to not collect certain items
-# 6- Follows Array structure as detailed below for future additions
-# 7- Results file should include as simple terminology as possible for easy troubleshooting reference and to provide direction for further investigation
-
-#Build Structure:
-#1. Call out standard variables as needed
-#2. Create Arrays for each individual app or category. If a new feature is released in existing categories, it will be added to that. If it is an entirely new feature set with multiple logs, a new array would be created
-#3. Run Arrays as designated in `logGrabberMasterArray`
-#4. Remove Folders with empty sets using the Cleanup Function
-#5. Zip and stamp folder with identical mame as unzipped folder
 
 #Adding a new function/array
 #1. Create a variable in the standard variable declarations
@@ -618,4 +610,3 @@ Zip_Folder
 
 #incorporate more log show commands for Jamf binary
 #log show --style compact --predicate 'subsystem == "com.jamf.management.daemon"' --debug > ~/Desktop/test.txt
-#log show --predicate "process CONTAINS 'mdmclient'"
