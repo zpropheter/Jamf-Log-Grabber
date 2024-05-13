@@ -607,6 +607,3 @@ Zip_Folder
 #4. In $logsToGrab, add the name of your app array so that the logGrabberMasterArray knows to run it
 #5. In `logGrabberMasterArray` edit the `case` function to add a case that matches what you put in $logsToGrab and then put the name of the function to run below, it should be self explanatory as you look at the case function
 #6. Run multiple tests to confirm that the whole script runs with everything in it and confirm the results are as expected
-
-#incorporate more log show commands for Jamf binary
-#log show --style compact --predicate 'subsystem == "com.jamf.management.daemon"' --debug > ~/Desktop/test.txt
