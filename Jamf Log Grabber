@@ -421,25 +421,36 @@ DeviceCompliance() {
 Remote_Assist() {
 	#ADD JAMF Remote Assist Log Folder
 	mkdir -p $JRA/Remote_Assist_Logs
-	if [ -e /Users/Shared/jamfdata ]; then cp -r "/Users/Shared/jamfdata" $JRA/Remote_Assist_Logs
-		touch $JRA/Info.txt
-		successfulFileDownloads=$(grep -R "File:" /Users/Shared/jamfdata/log/Connect/DragSimulator/ | awk '/Transfer Successful!/' | sed 's/^.*File://' | sed 's/Transfer Successful!//g')
-		if [[ $successfulFileDownloads == "" ]]; then 
-			echo "No File Transfers found from most recent session" >> $JRA/Info.txt
+	JRA3Check=$(defaults read /Library/Application\ Support/JAMF/Remote\ Assist/jamfRemoteAssistConnectorUI.app/Contents/Info.plist CFBundleVersion 2>/dev/null)
+	if [[ $JRA3Check == "" ]]; then
+		printf '<h2>Jamf Remote Assist</h2>' >> $results
+		printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Remote Assist not installed or version older than 1.3.0. Checking for older version logs" >> $results
+		if [ -e /Users/Shared/jamfdata ]; then cp -r "/Users/Shared/jamfdata" $JRA/Remote_Assist_Logs
+			touch $JRA/Info.txt
+			printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Remote Assist logs found from an out of date version. Recommend updating Jamf Remote Assist or uninstalling if not being used in your fleet." >> $results
+			successfulFileDownloads=$(grep -R "File:" /Users/Shared/jamfdata/log/Connect/DragSimulator/ | awk '/Transfer Successful!/' | sed 's/^.*File://' | sed 's/Transfer Successful!//g')
+			if [[ $successfulFileDownloads == "" ]]; then 
+				echo "No File Transfers found from most recent session" >> $JRA/Info.txt
+			else
+				echo -e "The files most recently downloaded from Jamf Remote Assist are: $successfulFileDownloads" >> $JRA/Info.txt
+			fi
+			lastremote=$(grep -r "grapplemdm::ipc::tcp::TcpConnector::Connect(ipc::ListenerIdentifier::Ref) connected to 127.0.0.1:" /Users/Shared/jamfdata/log/Connect/ | sed 's/^.*log://' | awk '{print $1}')
+			if [[ $lastremote == "" ]]; then 
+				echo "No Remote Sessions have been launched by Jamf Remote Assist on this device or the logs have been manually cleared." >> $JRA/Info.txt
+			else
+				echo "Last Jamf Remote Assist session listed below:" >> $JRA/Info.txt
+				echo ${lastremote:1} | awk '{print $1}' >> $JRA/Info.txt
+			fi		
 		else
-			echo -e "The files most recently downloaded from Jamf Remote Assist are: $successfulFileDownloads" >> $JRA/Info.txt
+			printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Remote Assist logs not found. Only available on Jamf Pro 11.1.0 and up." >> $results
 		fi
-		lastremote=$(grep -r "grapplemdm::ipc::tcp::TcpConnector::Connect(ipc::ListenerIdentifier::Ref) connected to 127.0.0.1:" /Users/Shared/jamfdata/log/Connect/ | sed 's/^.*log://' | awk '{print $1}')
-		if [[ $lastremote == "" ]]; then 
-			echo "No Remote Sessions have been launched by Jamf Remote Assist on this device or the logs have been manually cleared." >> $JRA/Info.txt
-		else
-			echo "Last Jamf Remote Assist session listed below:" >> $JRA/Info.txt
-			echo ${lastremote:1} | awk '{print $1}' >> $JRA/Info.txt
-		fi		
 	else
 		printf '<h2>Jamf Remote Assist</h2>' >> $results
-		printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Remote Assist logs not found. Only available on Jamf Pro 11.1.0 and up." >> $results
+		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist Version: $JRA3Check" >> $results
+		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist Debug logs copied to JRA folder" >> $results
+		log show --style compact --predicate 'subsystem == "com.jamf.remoteassist"' --debug > $JRA/JRA_debug
 	fi
+	
 }
 
 ####################################################################################################
