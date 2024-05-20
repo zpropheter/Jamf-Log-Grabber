@@ -57,6 +57,7 @@ App_Installers=$log_folder/App_Installers
 jamfLog=$JSS/jamf.log
 
 reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
+protectDiagnostics=$(ls "$HOME/Desktop/" | grep "JamfProtectDiagnostics")
 
 
 
@@ -87,7 +88,7 @@ CustomApp3LogSource="$9"
 
 #Build a results file in HTML
 buildHTMLResults() {
-printf '<html>
+	printf '<html>
 	<head>  
 		<style type="text/css">
 			body { background-color:#444444;font-family:Helvetica,Arial,sans-serif;margin:20px; }
@@ -270,7 +271,7 @@ Connect() {
 	
 	connectLoginLicenseArray() {
 		if [[ "$connectLoginLicenseInstalled" == "" ]]; then
-			printf '<code style="color: %s;">%s<br></code>' "white" "--No License found for com.jamf.connect.login" >> $results
+			printf '<code style="color: %s;">%s<br></code>' "red" "No License found for com.jamf.connect.login" >> $results
 		else
 			for i in $profilesWithConnectLicense; do
 				if [[ "$i" == $connectLoginLicenseInstalled ]]; then
@@ -297,12 +298,18 @@ Connect() {
 Protect() {
 	#MAKE DIRECTORY FOR ALL JAMF SECURITY RELATED FILES
 	mkdir -p $log_folder/Jamf_Security
+	printf '<h2>Jamf Protect</h2>' >> $results
+	#CHECK FOR JAMF PROTECT DIAGNOSTICS FOLDER, THEN COPY IF PRESENT
+	if [ $protectDiagnostics != "" ]; then cp -r "$HOME/Desktop/$protectDiagnostics" "$security"
+		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been ran in the last 24 hours on this device." >> $results
+	fi
 	#CHECK FOR JAMF PROTECT PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
 	if [ -e /Library/Managed\ Preferences/com.jamf.protect.plist ]; then cp "/Library/Managed Preferences/com.jamf.protect.plist" "$security/com.jamf.protect.plist"
+		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Protect plist found" >> $results
 		plutil -convert xml1 "$security/com.jamf.protect.plist"
 		protectctl info > $security/jamfprotectinfo.log
+		
 	else
-		printf '<h2>Jamf Protect</h2>' >> $results
 		printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Protect plist not found" >> $results
 	fi
 	#CHECK FOR JAMF TRUST PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
@@ -414,25 +421,36 @@ DeviceCompliance() {
 Remote_Assist() {
 	#ADD JAMF Remote Assist Log Folder
 	mkdir -p $JRA/Remote_Assist_Logs
-	if [ -e /Users/Shared/jamfdata ]; then cp -r "/Users/Shared/jamfdata" $JRA/Remote_Assist_Logs
-		touch $JRA/Info.txt
-		successfulFileDownloads=$(grep -R "File:" /Users/Shared/jamfdata/log/Connect/DragSimulator/ | awk '/Transfer Successful!/' | sed 's/^.*File://' | sed 's/Transfer Successful!//g')
-		if [[ $successfulFileDownloads == "" ]]; then 
-			echo "No File Transfers found from most recent session" >> $JRA/Info.txt
+	JRA3Check=$(defaults read /Library/Application\ Support/JAMF/Remote\ Assist/jamfRemoteAssistConnectorUI.app/Contents/Info.plist CFBundleVersion 2>/dev/null)
+	if [[ $JRA3Check == "" ]]; then
+		printf '<h2>Jamf Remote Assist</h2>' >> $results
+		printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Remote Assist not installed or version older than 1.3.0. Checking for older version logs" >> $results
+		if [ -e /Users/Shared/jamfdata ]; then cp -r "/Users/Shared/jamfdata" $JRA/Remote_Assist_Logs
+			touch $JRA/Info.txt
+			printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Remote Assist logs found from an out of date version. Recommend updating Jamf Remote Assist or uninstalling if not being used in your fleet." >> $results
+			successfulFileDownloads=$(grep -R "File:" /Users/Shared/jamfdata/log/Connect/DragSimulator/ | awk '/Transfer Successful!/' | sed 's/^.*File://' | sed 's/Transfer Successful!//g')
+			if [[ $successfulFileDownloads == "" ]]; then 
+				echo "No File Transfers found from most recent session" >> $JRA/Info.txt
+			else
+				echo -e "The files most recently downloaded from Jamf Remote Assist are: $successfulFileDownloads" >> $JRA/Info.txt
+			fi
+			lastremote=$(grep -r "grapplemdm::ipc::tcp::TcpConnector::Connect(ipc::ListenerIdentifier::Ref) connected to 127.0.0.1:" /Users/Shared/jamfdata/log/Connect/ | sed 's/^.*log://' | awk '{print $1}')
+			if [[ $lastremote == "" ]]; then 
+				echo "No Remote Sessions have been launched by Jamf Remote Assist on this device or the logs have been manually cleared." >> $JRA/Info.txt
+			else
+				echo "Last Jamf Remote Assist session listed below:" >> $JRA/Info.txt
+				echo ${lastremote:1} | awk '{print $1}' >> $JRA/Info.txt
+			fi		
 		else
-			echo -e "The files most recently downloaded from Jamf Remote Assist are: $successfulFileDownloads" >> $JRA/Info.txt
+			printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Remote Assist logs not found. Only available on Jamf Pro 11.1.0 and up." >> $results
 		fi
-		lastremote=$(grep -r "grapplemdm::ipc::tcp::TcpConnector::Connect(ipc::ListenerIdentifier::Ref) connected to 127.0.0.1:" /Users/Shared/jamfdata/log/Connect/ | sed 's/^.*log://' | awk '{print $1}')
-		if [[ $lastremote == "" ]]; then 
-			echo "No Remote Sessions have been launched by Jamf Remote Assist on this device or the logs have been manually cleared." >> $JRA/Info.txt
-		else
-			echo "Last Jamf Remote Assist session listed below:" >> $JRA/Info.txt
-			echo ${lastremote:1} | awk '{print $1}' >> $JRA/Info.txt
-		fi		
 	else
 		printf '<h2>Jamf Remote Assist</h2>' >> $results
-		printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Remote Assist logs not found. Only available on Jamf Pro 11.1.0 and up." >> $results
+		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist Version: $JRA3Check" >> $results
+		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist Debug logs copied to JRA folder" >> $results
+		log show --style compact --predicate 'subsystem == "com.jamf.remoteassist"' --debug > $JRA/JRA_debug
 	fi
+	
 }
 
 ####################################################################################################
@@ -452,10 +470,10 @@ AppInstallers() {
 #When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
 CustomApp1Array() {
 	mkdir -p $log_folder/$CustomApp1Name
-	if [ -e $CustomApp1LogSource ]; then cp $CustomApp1LogSource $CustomApp1Folder
+	if [ -e $CustomApp1LogSource ] && [ $CustomApp1LogSource != "/" ]; then cp -r $CustomApp1LogSource $CustomApp1Folder
 	else
 		printf '<h2>'$CustomApp1Name'</h2>' >> $results
-		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp1Name does not have a log file available to grab." >> $results
+		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp1Name does not have a log file available to grab or was set to an invalid path." >> $results
 	fi
 }
 
@@ -464,10 +482,10 @@ CustomApp1Array() {
 #When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
 CustomApp2Array() {
 	mkdir -p $log_folder/$CustomApp2Name
-	if [ -e $CustomApp2LogSource ]; then cp $CustomApp2LogSource $CustomApp2Folder
+	if [ -e $CustomApp2LogSource ] && [ $CustomApp2LogSource != "/" ]; then cp -r $CustomApp2LogSource $CustomApp2Folder
 	else
 		printf '<h2>'$CustomApp2Name'</h2>' >> $results
-		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp2Name does not have a log file available to grab." >> $results
+		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp2Name does not have a log file available to grab or was set to an invalid path." >> $results
 	fi
 }
 
@@ -476,10 +494,10 @@ CustomApp2Array() {
 #When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
 CustomApp3Array() {
 	mkdir -p $log_folder/$CustomApp3Name
-	if [ -e $CustomApp3LogSource ]; then cp $CustomApp3LogSource $CustomApp3Folder
+	if [ -e $CustomApp3LogSource ] && [ $CustomApp3LogSource != "/" ]; then cp -r $CustomApp3LogSource $CustomApp3Folder
 	else
 		printf '<h2>'$CustomApp3Name'</h2>' >> $results
-		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp3Name does not have a log file available to grab." >> $results
+		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp3Name does not have a log file available to grab or was set to an invalid path." >> $results
 	fi
 }
 
@@ -501,7 +519,7 @@ Cleanup() {
 			:
 		fi
 	done
-printf '<code style="color: %s;">%s<br></code>' "white" "Completed Log Grabber on '$(currenttime)'" >> $results
+	printf '<code style="color: %s;">%s<br></code>' "white" "Completed Log Grabber on '$(currenttime)'" >> $results
 }
 
 ####################################################################################################
@@ -590,23 +608,6 @@ Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
 Zip_Folder 
 
-#Notes for future editions 
-#The primary purpose of JLG is to provide a lightweight and quick approach to collecting relevant logs for Support. Core principles for ongoing development are as follows
-# 1- Never takes more than a minute to run
-# 2- Runs in background without interruption to user
-# 3- Provides ALL relevant logs for standard troubleshooting in an I.T. or support function
-# 4.0- Is never uploaded to a device record "attachments" section in Jamf Pro (can cause performance degradation to servers long term)
-# 4.1- Never provides built in API call for such an action either 
-# 5- Easy structure to customize what logs are gathered if an Admin wishes to not collect certain items
-# 6- Follows Array structure as detailed below for future additions
-# 7- Results file should include as simple terminology as possible for easy troubleshooting reference and to provide direction for further investigation
-
-#Build Structure:
-#1. Call out standard variables as needed
-#2. Create Arrays for each individual app or category. If a new feature is released in existing categories, it will be added to that. If it is an entirely new feature set with multiple logs, a new array would be created
-#3. Run Arrays as designated in `logGrabberMasterArray`
-#4. Remove Folders with empty sets using the Cleanup Function
-#5. Zip and stamp folder with identical mame as unzipped folder
 
 #Adding a new function/array
 #1. Create a variable in the standard variable declarations
@@ -615,7 +616,3 @@ Zip_Folder
 #4. In $logsToGrab, add the name of your app array so that the logGrabberMasterArray knows to run it
 #5. In `logGrabberMasterArray` edit the `case` function to add a case that matches what you put in $logsToGrab and then put the name of the function to run below, it should be self explanatory as you look at the case function
 #6. Run multiple tests to confirm that the whole script runs with everything in it and confirm the results are as expected
-
-#incorporate more log show commands for Jamf binary
-#log show --style compact --predicate 'subsystem == "com.jamf.management.daemon"' --debug > ~/Desktop/test.txt
-#log show --predicate "process CONTAINS 'mdmclient'"
