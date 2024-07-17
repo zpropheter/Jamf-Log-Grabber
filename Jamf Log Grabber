@@ -207,9 +207,9 @@ Connect() {
 		printf '<h3>License Check</h3>' >> $results
 		LicensefromLogin=$(defaults read /Library/Managed\ Preferences/com.jamf.connect.login.plist LicenseFile 2>/dev/null)
 		LicensefromMenubar=$(defaults read /Library/Managed\ Preferences/com.jamf.connect.plist LicenseFile 2>/dev/null)
-		if [[ "$LicensefromLogin" == "PD94"* ]]; then
+		if [[ "$LicensefromLogin" != "" ]]; then
 			(echo "$LicensefromLogin" | base64 -d) > $connect/license.txt
-		elif [[ "$LicensefromMenubar" == "PD94"* ]]; then
+		elif [[ "$LicensefromMenubar" != "" ]]; then
 			(echo "$LicensefromMenubar" | base64 -d) > $connect/license.txt
 		else
 			file=""
@@ -256,7 +256,7 @@ Connect() {
 			for i in $profilesWithConnectLicense; do
 				if [[ "$i" == $connectLicenseInstalled ]]; then
 					printf '<code style="color: %s;">%s<br></code>' "lime" "--Matching Profile found for installed Connect License (com.jamf.connect)." >> $results
-					if [ $connectDateCompare -ge $connectLicenseExpiration ]; then
+					if [[ $connectDateCompare -ge $connectLicenseExpiration ]]; then
 						printf '<code style="color: %s;">%s<br></code>' "red" "--Currently installed Jamf Connect License is expired." >> $results
 					else
 						printf '<code style="color: %s;">%s<br></code>' "lime" "--Currently installed Jamf Connect License is valid." >> $results
@@ -288,8 +288,18 @@ Connect() {
 			done	
 		fi
 	}
+	
+	connectLicenseFormatCheck() {
+		PI110629Check=$(grep "<data>PD94" "$JSS/profiles.xml")
+		if [[ $PI110629Check == "*" ]]; then
+			printf '<code style="color: %s;">%s<br></code>' "red" "Improper key value assigned to LicenseFile, may be affected by PI110629" >> $results
+		elif [[ $PI110629Check == "" ]]; then
+			printf '<code style="color: %s;">%s<br></code>' "lime" "Key value assigned to LicenseFile uses string tag and does not appear to be affected by PI110629" >> $results
+		fi
+	}
 	connectLicenseArray 
 	connectLoginLicenseArray 
+	connectLicenseFormatCheck
 }
 
 
