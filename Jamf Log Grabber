@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 #Jamf Log Grabber is designed to collect any logs associated with Jamf Products as well as MDM Managed Preferences.
@@ -290,11 +291,11 @@ Connect() {
 	}
 	
 	connectLicenseFormatCheck() {
-		PI110629Check=$(grep "<string>PD94" "$JSS/profiles.xml")
-		if [[ $PI110629Check == "*" ]]; then
-			printf '<code style="color: %s;">%s<br></code>' "red" "Improper key value assigned to LicenseFile, may be affected by PI110629" >> $results
-		elif [[ $PI110629Check == "" ]]; then
-			printf '<code style="color: %s;">%s<br></code>' "lime" "Key value assigned to LicenseFile uses string tag and does not appear to be affected by PI110629" >> $results
+		PI110629Check=$(awk '/string>PD94/ {count++} END {print count}' "$JSS/profiles.xml")
+		if [[ $PI110629Check -ge "1" ]]; then
+			printf '<code style="color: %s;">%s<br></code>' "red" "Key value assigned to LicenseFile uses string tag and appears to be affected by PI110629" >> $results
+		elif [[ $PI110629Check -le "0" ]]; then
+			printf '<code style="color: %s;">%s<br></code>' "lime" "Key value assigned to LicenseFile uses data tag and does not appear to be affected by PI110629" >> $results
 		fi
 	}
 	connectLicenseArray 
@@ -310,7 +311,7 @@ Protect() {
 	mkdir -p $log_folder/Jamf_Security
 	printf '<h2>Jamf Protect</h2>' >> $results
 	#CHECK FOR JAMF PROTECT DIAGNOSTICS FOLDER, THEN COPY IF PRESENT
-	if [ $protectDiagnostics != "" ]; then cp -r "$HOME/Desktop/$protectDiagnostics" "$security"
+	if [[ $protectDiagnostics != "" ]]; then cp -r "$HOME/Desktop/$protectDiagnostics" "$security"
 		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been ran in the last 24 hours on this device." >> $results
 	fi
 	#CHECK FOR JAMF PROTECT PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
