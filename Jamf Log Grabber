@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 #Jamf Log Grabber is designed to collect any logs associated with Jamf Products as well as MDM Managed Preferences.
@@ -459,7 +458,7 @@ Remote_Assist() {
 		printf '<h2>Jamf Remote Assist</h2>' >> $results
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist Version: $JRA3Check" >> $results
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist Debug logs copied to JRA folder" >> $results
-		log show --style compact --predicate 'subsystem == "com.jamf.remoteassist"' --debug > $JRA/JRA_debug
+		log stream --level debug --predicate 'subsystem BEGINSWITH "com.jamf.remoteassist"' --style compact > $JRA/JRA_debug		
 	fi
 	
 }
