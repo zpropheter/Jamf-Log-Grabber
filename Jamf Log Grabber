@@ -290,7 +290,7 @@ Connect() {
 	}
 	
 	connectLicenseFormatCheck() {
-		PI110629Check=$(grep "<data>PD94" "$JSS/profiles.xml")
+		PI110629Check=$(grep "<string>PD94" "$JSS/profiles.xml")
 		if [[ $PI110629Check == "*" ]]; then
 			printf '<code style="color: %s;">%s<br></code>' "red" "Improper key value assigned to LicenseFile, may be affected by PI110629" >> $results
 		elif [[ $PI110629Check == "" ]]; then
