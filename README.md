@@ -1,26 +1,26 @@
 # Jamf Log Grabber
 ## _Get all the logs you'll ever need_
 
-<img src="https://i.imgur.com/tvEU3Lt.png" width="200" height="200" />
+Jamf Log Grabber is a bash based script that can be deployed manually, via Jamf MDM Policy, or as a Self Service Tool. It creates a zip folder on the user's desktop for upload to your service desk for troubleshooting.
 
-Jamf Log Grabber is a bash based script that can be deployed manually, via Jamf MDM Policy, or as a Self Service Tool. It creates a zip folder on the endpoint's desktop for upload to your service desk for troubleshooting.
+## Supported Applications Include
+- Jamf MDM Client
+- Jamf Connect
+- Jamf Protect
+- Jamf Trust
+- Jamf Remote Assist
+- Device Compliance
+- App Installers
 
-Here's everything you'll be able to see
-- Jamf Binary Related Logs and plists: com.jamfsoftware.jamf.plist, Jamf.Log, Install.Log, System.logs
-- Jamf Connect Logs and Plists
-- Jamf Protect Plists
-- Jamf Remote Assist Reporting for most recent session and
-- App Installer Plists
-- MDM Communication Statuses
-- Recon Troubleshooting: Checks for files left behind during a Jamf Recon command and provides a file name for further investigation
-- Intune Logs for Device Compliance
-- 3 Custom apps to configure for your own log gathering
 
 ## Features
 
-- Ready to deploy script with preset Jamf Pro Variables
 - Simplified Customization
-- Verbose results file for fast diagnostics
+- Verbose results file for faster diagnostics
+- MDM Communication Information
+- Inventory Troubleshooting: Checks for files left behind during a Jamf Recon command and provides a file name for further investigation
+- Jamf Connect License Check and troubleshooting
+- 3 Custom apps to configure for your own log gathering
 
 ## Installation
 

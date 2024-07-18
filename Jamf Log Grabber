@@ -95,6 +95,7 @@ buildHTMLResults() {
 			h1 { margin-top:1em;margin-bottom:0.2em;color:#9eb8d5 }
 			h2 { margin-top:1em;margin-bottom:0.2em;color:#37bb9a }
 			h3 { margin-top:0.8em;margin-bottom:0.2em;color:#37bb9a }
+			h4 { margin-top:0.8em;margin-bottom:0.2em;color:#37bb9a }
 			p { margin-top:0.2em;margin-bottom:0.2em;padding: 0 0 0 1px;color:white }
 			.tg    { border-collapse:collapse;border-spacing:0;border-color:#9ABAD9;width: 900px; }
 			.tg td { font-family:monospace;font-size:14px;padding:10px 20px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-top-width:1px;border-bottom-width:1px;border-color:#9ABAD9;color:#444;background-color:#EBF5FF; }
@@ -207,9 +208,9 @@ Connect() {
 		printf '<h3>License Check</h3>' >> $results
 		LicensefromLogin=$(defaults read /Library/Managed\ Preferences/com.jamf.connect.login.plist LicenseFile 2>/dev/null)
 		LicensefromMenubar=$(defaults read /Library/Managed\ Preferences/com.jamf.connect.plist LicenseFile 2>/dev/null)
-		if [[ "$LicensefromLogin" == "PD94"* ]]; then
+		if [[ "$LicensefromLogin" != "" ]]; then
 			(echo "$LicensefromLogin" | base64 -d) > $connect/license.txt
-		elif [[ "$LicensefromMenubar" == "PD94"* ]]; then
+		elif [[ "$LicensefromMenubar" != "" ]]; then
 			(echo "$LicensefromMenubar" | base64 -d) > $connect/license.txt
 		else
 			file=""
@@ -256,7 +257,7 @@ Connect() {
 			for i in $profilesWithConnectLicense; do
 				if [[ "$i" == $connectLicenseInstalled ]]; then
 					printf '<code style="color: %s;">%s<br></code>' "lime" "--Matching Profile found for installed Connect License (com.jamf.connect)." >> $results
-					if [ $connectDateCompare -ge $connectLicenseExpiration ]; then
+					if [[ $connectDateCompare -ge $connectLicenseExpiration ]]; then
 						printf '<code style="color: %s;">%s<br></code>' "red" "--Currently installed Jamf Connect License is expired." >> $results
 					else
 						printf '<code style="color: %s;">%s<br></code>' "lime" "--Currently installed Jamf Connect License is valid." >> $results
@@ -288,8 +289,18 @@ Connect() {
 			done	
 		fi
 	}
+	
+	connectLicenseFormatCheck() {
+		PI110629Check=$(awk '/string>PD94/ {count++} END {print count}' "$JSS/profiles.xml")
+		if [[ $PI110629Check -ge "1" ]]; then
+			printf '<code style="color: %s;">%s<br></code>' "red" "Key value assigned to LicenseFile uses string tag and appears to be affected by PI110629" >> $results
+		elif [[ $PI110629Check -le "0" ]]; then
+			printf '<code style="color: %s;">%s<br></code>' "lime" "Key value assigned to LicenseFile uses data tag and does not appear to be affected by PI110629" >> $results
+		fi
+	}
 	connectLicenseArray 
 	connectLoginLicenseArray 
+	connectLicenseFormatCheck
 }
 
 
@@ -300,7 +311,7 @@ Protect() {
 	mkdir -p $log_folder/Jamf_Security
 	printf '<h2>Jamf Protect</h2>' >> $results
 	#CHECK FOR JAMF PROTECT DIAGNOSTICS FOLDER, THEN COPY IF PRESENT
-	if [ $protectDiagnostics != "" ]; then cp -r "$HOME/Desktop/$protectDiagnostics" "$security"
+	if [[ $protectDiagnostics != "" ]]; then cp -r "$HOME/Desktop/$protectDiagnostics" "$security"
 		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been ran in the last 24 hours on this device." >> $results
 	fi
 	#CHECK FOR JAMF PROTECT PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
@@ -424,6 +435,145 @@ Remote_Assist() {
 	JRA3Check=$(defaults read /Library/Application\ Support/JAMF/Remote\ Assist/jamfRemoteAssistConnectorUI.app/Contents/Info.plist CFBundleVersion 2>/dev/null)
 	if [[ $JRA3Check == "" ]]; then
 		printf '<h2>Jamf Remote Assist</h2>' >> $results
+		function createNetworkCheckTableJRA () {
+
+			/bin/cat << EOF >> "$results"  
+		<p />
+		<p>Network access to the following hostnames are required for using Jamf Remote Assist. These hostnames are a small sample as the Relay hostnames can increment up to 100 currently.</p>
+${HOST_TEST_TABLES}
+EOF
+		}
+		
+		
+		function CalculateHostInfoTablesJRA () {
+			echo "[step] Checking URLS"
+			lastCategory="zzzNone"  # Some fake category so we recognize that the first host is the start of a new category
+			firstServer="yes"       # Flag for the first host so we don't try to close the preceding table -- there won't be one. 
+			HOST_TEST_TABLES=''    # This is the var we will insert into the HTML
+			for SERVER in "${JRA_URL_ARRAY[@]}"; do
+				#split the record info fields
+				HOSTNAME=$(echo ${SERVER} | cut -d ',' -f1)
+				PORT=$(echo ${SERVER} | cut -d ',' -f2)
+				PROTOCOL=$(echo ${SERVER} | cut -d ',' -f3)
+				CATEGORY=$(echo ${SERVER} | cut -d ',' -f4)
+				# We have categories of hosts... enrollment, software update, etc. We'll put them in separate tables
+				# If the category for this host is different than the last one and is not blank...
+				if [[ "${lastCategory}" != "${CATEGORY}" ]] && [[ ! -z "${CATEGORY}" ]]; then
+					# If this is not the first server, close up the table from the previous category before moving on to the next. 
+					echo "Starting Category : ${CATEGORY}"
+					if [[ "${firstServer}" != "yes" ]]; then
+						#We've already started the table html so no need to do it again.  
+						HOST_TEST_TABLES+="    </table>${NL}"
+					fi
+					firstServer="no"
+					lastCategory="${CATEGORY}"
+					HOST_TEST_TABLES+="    <h4>${CATEGORY}</h4>${NL}"
+					HOST_TEST_TABLES+="    <table class=\"tg\">${NL}"
+					HOST_TEST_TABLES+="      <tr><th width=\"40%\">HOSTNAME</th><th width=\"50%\">Reverse DNS</th><th width=\"10%\">IP Address</th><th width=\"10%\">Port</th><th width=\"10%\">Protocol</th><th width=\"10%\">Accessible</th><th width=\"20%\">SSL Error</th></tr>${NL}"
+				fi # End of table start and end logic.
+				
+				echo "  > Checking connectivity to: ${HOSTNAME} ${PORT} ${PROTOCOL}"
+				
+				# Now print the info for this host...
+				#Perform Host nslookup to get reported IP
+				IP_ADDRESS=$(/usr/bin/nslookup ${HOSTNAME} | /usr/bin/grep "Address:" | /usr/bin/awk '{print$2}' | /usr/bin/tail -1)
+				
+				
+				#Get Reverse DNS record
+				REVERSE_DNS=$(/usr/bin/dig -x ${IP_ADDRESS} +short | /usr/bin/sed 's/.$//')
+				
+				# Using nc, if proxy defined then adding in proxy flag
+				if [[ ${PROTOCOL} == "TCP" ]]; then
+					if [[ -f "${LOCAL_PROXY_PAC_FILE}" ]]; then
+						PROXY_PARSE_DATA=$(GetProxyHostFromPac ${HOSTNAME} ${PORT})
+						PROXY_HOST=$(echo ${PROXY_PARSE_DATA} | /usr/bin/awk '{print $2}' | /usr/bin/tr -d "';" | /usr/bin/cut -d: -f1)
+						PROXY_PORT=$(echo ${PROXY_PARSE_DATA} | /usr/bin/awk '{print $2}' | /usr/bin/tr -d "';" | /usr/bin/cut -d: -f2)
+					fi
+					
+					#Check if Proxy set
+					if [[ ${PROXY_HOST} == "" ]] && [[ ${PROXY_PORT} == "" ]];then
+						#no proxy set
+						STATUS=$(/usr/bin/nc -z -G 1 ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')	
+					else
+						echo "  > ${PROXY_HOST}:${PROXY_PORT} to be used for ${HOSTNAME}:${PORT}"
+						STATUS=$(/usr/bin/nc -z -G 1 -x ${PROXY_HOST}:${PROXY_PORT} -X connect ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
+					fi
+					
+				elif [[ ${PROTOCOL} == "TCP - non-proxied" ]]; then
+					#for non proxy aware urls we will be using netcat aka nc
+					STATUS=$(/usr/bin/nc -z -G 1 ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
+				else    
+					# UDP goes direct... not proxied. 
+					STATUS=$(/usr/bin/nc -u -z ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
+					
+				fi
+				
+				#Based on Status will set Availability Value
+				if [[ ${STATUS} =~ "succeeded" ]]; then
+					AVAILBILITY="succeeded"
+					
+				else
+					AVAILBILITY="failed"
+				fi
+				
+				
+				if [[ "${AVAILBILITY}" == "succeeded" ]]; then
+					AVAILBILITY_STATUS='<td style="color: green;">Available</td>'
+					#Test for SSL Inspection
+					if [[ ${PORT} == "80" ]]; then
+						#http traffic no ssl inspection issues
+						SSL_STATUS='<td style="color: green;">N/A</td>'
+					else
+						if [[ ${PROTOCOL} == "TCP" ]]; then                
+							if [[ ${PROXY_HOST} == "" ]] && [[ ${PROXY_PORT} == "" ]];then
+								CERT_STATUS=$(echo | /usr/bin/openssl s_client -showcerts -connect "${HOSTNAME}:${PORT}" -servername "${HOSTNAME}" 2>/dev/null | /usr/bin/openssl x509 -noout -issuer )
+								
+							else
+								CERT_STATUS=$(echo | /usr/bin/openssl s_client -showcerts -proxy "${PROXY_HOST}:${PROXY_PORT}" -connect "${HOSTNAME}:${PORT}" -servername "${HOSTNAME}" 2>/dev/null | /usr/bin/openssl x509 -noout -issuer)
+							fi
+							
+							if [[ ${CERT_STATUS} != *"Apple Inc"* ]] && [[ "${CERT_STATUS}" != *"Akamai Technologies"* ]] && [[ "${CERT_STATUS}" != *"Amazon"* ]] && [[ "${CERT_STATUS}" != *"DigiCert"* ]] && [[ "${CERT_STATUS}" != *"Microsoft"* ]] && [[ "${CERT_STATUS}" != *"COMODO"* ]] && [[ "${CERT_STATUS}" != *"QuoVadis"* ]]; then
+								
+								SSL_ISSUER=$(echo ${CERT_STATUS} | awk -F'O=|/OU' '{print $2}')
+								
+								if [[ ${HOSTNAME} == *"jcdsdownloads.services.jamfcloud.com" ]];then
+									SSL_STATUS='<td style="color: green;">N/A</td>'
+								else	
+									SSL_STATUS="<td style=\"color: red;\">Unexpected Certificate: ${SSL_ISSUER}</td>"
+								fi
+								
+							else	
+								
+								SSL_STATUS='<td style="color: green;">Successful</td>'
+							fi
+						else
+							SSL_STATUS='<td style="color: green;">N/A</td>'
+						fi
+					fi
+				else
+					# nc did not connect. There is no point in trying the SSL cert subject test. 
+					AVAILBILITY_STATUS='<td style="color: red;">Unavailable</td>'
+					SSL_STATUS='<td style="color: black;">Not checked</td>'
+				fi
+				
+				# Done. Stick the row of info into the HTML var...
+				HOST_TEST_TABLES+="        <tr><td>${HOSTNAME}</td><td>${REVERSE_DNS}</td><td>${IP_ADDRESS}</td><td>${PORT}</td><td>${PROTOCOL}</td>${AVAILBILITY_STATUS}${SSL_STATUS}</tr>${NL}"
+			done
+			# Close up the html for the final table
+			HOST_TEST_TABLES+="    </table>${NL}"
+		}
+		
+		JRA_URL_ARRAY=(
+			#Device setup
+			"us.jra.services.jamfcloud.com,443,TCP,Connection Results"
+			"files.jra.services.jamfcloud.com,443,TCP"
+			"download.jra.services.jamfcloud.com,443,TCP"
+			"relay-1.us.jra.services.jamfcloud.com,443,TCP"
+			"socket.us.jra.services.jamfcloud.com,5555,UDP"
+		)
+		CalculateHostInfoTablesJRA
+		createNetworkCheckTableJRA 
+		
 		printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Remote Assist not installed or version older than 1.3.0. Checking for older version logs" >> $results
 		if [ -e /Users/Shared/jamfdata ]; then cp -r "/Users/Shared/jamfdata" $JRA/Remote_Assist_Logs
 			touch $JRA/Info.txt
@@ -448,7 +598,7 @@ Remote_Assist() {
 		printf '<h2>Jamf Remote Assist</h2>' >> $results
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist Version: $JRA3Check" >> $results
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist Debug logs copied to JRA folder" >> $results
-		log show --style compact --predicate 'subsystem == "com.jamf.remoteassist"' --debug > $JRA/JRA_debug
+		log stream --level debug --predicate 'subsystem BEGINSWITH "com.jamf.remoteassist"' --style compact > $JRA/JRA_debug		
 	fi
 	
 }
@@ -459,6 +609,141 @@ Remote_Assist() {
 AppInstallers() {
 	mkdir -p $App_Installers
 	if [ -e /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/ ]; then cp -r /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/ directory $App_Installers
+		
+		function createNetworkCheckTableAppInstallers () {
+			/bin/cat << EOF >> "$results"  
+		<p />
+		<h2>App Installers</h2>
+		<p>Network access to the following hostname is required for using Jamf's App Installers.</p>
+${HOST_TEST_TABLES}
+EOF
+		}
+		
+		function CalculateHostInfoTablesAppInstallers () {
+			echo "[step] Checking URLS"
+			lastCategory="zzzNone"  # Some fake category so we recognize that the first host is the start of a new category
+			firstServer="yes"       # Flag for the first host so we don't try to close the preceding table -- there won't be one. 
+			HOST_TEST_TABLES=''    # This is the var we will insert into the HTML
+			for SERVER in "${APP_Installer_URL_ARRAY[@]}"; do
+				#split the record info fields
+				HOSTNAME=$(echo ${SERVER} | cut -d ',' -f1)
+				PORT=$(echo ${SERVER} | cut -d ',' -f2)
+				PROTOCOL=$(echo ${SERVER} | cut -d ',' -f3)
+				CATEGORY=$(echo ${SERVER} | cut -d ',' -f4)
+				# We have categories of hosts... enrollment, software update, etc. We'll put them in separate tables
+				# If the category for this host is different than the last one and is not blank...
+				if [[ "${lastCategory}" != "${CATEGORY}" ]] && [[ ! -z "${CATEGORY}" ]]; then
+					# If this is not the first server, close up the table from the previous category before moving on to the next. 
+					echo "Starting Category : ${CATEGORY}"
+					if [[ "${firstServer}" != "yes" ]]; then
+						#We've already started the table html so no need to do it again.  
+						HOST_TEST_TABLES+="    </table>${NL}"
+					fi
+					firstServer="no"
+					lastCategory="${CATEGORY}"
+					HOST_TEST_TABLES+="    <h4>${CATEGORY}</h4>${NL}"
+					HOST_TEST_TABLES+="    <table class=\"tg\">${NL}"
+					HOST_TEST_TABLES+="      <tr><th width=\"40%\">HOSTNAME</th><th width=\"50%\">Reverse DNS</th><th width=\"10%\">IP Address</th><th width=\"10%\">Port</th><th width=\"10%\">Protocol</th><th width=\"10%\">Accessible</th><th width=\"20%\">SSL Error</th></tr>${NL}"
+				fi # End of table start and end logic.
+				
+				echo "  > Checking connectivity to: ${HOSTNAME} ${PORT} ${PROTOCOL}"
+				
+				# Now print the info for this host...
+				#Perform Host nslookup to get reported IP
+				IP_ADDRESS=$(/usr/bin/nslookup ${HOSTNAME} | /usr/bin/grep "Address:" | /usr/bin/awk '{print$2}' | /usr/bin/tail -1)
+				
+				
+				#Get Reverse DNS record
+				REVERSE_DNS=$(/usr/bin/dig -x ${IP_ADDRESS} +short | /usr/bin/sed 's/.$//')
+				
+				# Using nc, if proxy defined then adding in proxy flag
+				if [[ ${PROTOCOL} == "TCP" ]]; then
+					if [[ -f "${LOCAL_PROXY_PAC_FILE}" ]]; then
+						PROXY_PARSE_DATA=$(GetProxyHostFromPac ${HOSTNAME} ${PORT})
+						PROXY_HOST=$(echo ${PROXY_PARSE_DATA} | /usr/bin/awk '{print $2}' | /usr/bin/tr -d "';" | /usr/bin/cut -d: -f1)
+						PROXY_PORT=$(echo ${PROXY_PARSE_DATA} | /usr/bin/awk '{print $2}' | /usr/bin/tr -d "';" | /usr/bin/cut -d: -f2)
+					fi
+					
+					#Check if Proxy set
+					if [[ ${PROXY_HOST} == "" ]] && [[ ${PROXY_PORT} == "" ]];then
+						#no proxy set
+						STATUS=$(/usr/bin/nc -z -G 1 ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')	
+					else
+						echo "  > ${PROXY_HOST}:${PROXY_PORT} to be used for ${HOSTNAME}:${PORT}"
+						STATUS=$(/usr/bin/nc -z -G 1 -x ${PROXY_HOST}:${PROXY_PORT} -X connect ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
+					fi
+					
+				elif [[ ${PROTOCOL} == "TCP - non-proxied" ]]; then
+					#for non proxy aware urls we will be using netcat aka nc
+					STATUS=$(/usr/bin/nc -z -G 1 ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
+				else    
+					# UDP goes direct... not proxied. 
+					STATUS=$(/usr/bin/nc -u -z ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
+					
+				fi
+				
+				#Based on Status will set Availability Value
+				if [[ ${STATUS} =~ "succeeded" ]]; then
+					AVAILBILITY="succeeded"
+					
+				else
+					AVAILBILITY="failed"
+				fi
+				
+				
+				if [[ "${AVAILBILITY}" == "succeeded" ]]; then
+					AVAILBILITY_STATUS='<td style="color: green;">Available</td>'
+					#Test for SSL Inspection
+					if [[ ${PORT} == "80" ]]; then
+						#http traffic no ssl inspection issues
+						SSL_STATUS='<td style="color: green;">N/A</td>'
+					else
+						if [[ ${PROTOCOL} == "TCP" ]]; then                
+							if [[ ${PROXY_HOST} == "" ]] && [[ ${PROXY_PORT} == "" ]];then
+								CERT_STATUS=$(echo | /usr/bin/openssl s_client -showcerts -connect "${HOSTNAME}:${PORT}" -servername "${HOSTNAME}" 2>/dev/null | /usr/bin/openssl x509 -noout -issuer )
+								
+							else
+								CERT_STATUS=$(echo | /usr/bin/openssl s_client -showcerts -proxy "${PROXY_HOST}:${PROXY_PORT}" -connect "${HOSTNAME}:${PORT}" -servername "${HOSTNAME}" 2>/dev/null | /usr/bin/openssl x509 -noout -issuer)
+							fi
+							
+							if [[ ${CERT_STATUS} != *"Apple Inc"* ]] && [[ "${CERT_STATUS}" != *"Akamai Technologies"* ]] && [[ "${CERT_STATUS}" != *"Amazon"* ]] && [[ "${CERT_STATUS}" != *"DigiCert"* ]] && [[ "${CERT_STATUS}" != *"Microsoft"* ]] && [[ "${CERT_STATUS}" != *"COMODO"* ]] && [[ "${CERT_STATUS}" != *"QuoVadis"* ]]; then
+								
+								SSL_ISSUER=$(echo ${CERT_STATUS} | awk -F'O=|/OU' '{print $2}')
+								
+								if [[ ${HOSTNAME} == *"jcdsdownloads.services.jamfcloud.com" ]];then
+									SSL_STATUS='<td style="color: green;">N/A</td>'
+								else	
+									SSL_STATUS="<td style=\"color: red;\">Unexpected Certificate: ${SSL_ISSUER}</td>"
+								fi
+								
+							else	
+								
+								SSL_STATUS='<td style="color: green;">Successful</td>'
+							fi
+						else
+							SSL_STATUS='<td style="color: green;">N/A</td>'
+						fi
+					fi
+				else
+					# nc did not connect. There is no point in trying the SSL cert subject test. 
+					AVAILBILITY_STATUS='<td style="color: red;">Unavailable</td>'
+					SSL_STATUS='<td style="color: black;">Not checked</td>'
+				fi
+				
+				# Done. Stick the row of info into the HTML var...
+				HOST_TEST_TABLES+="        <tr><td>${HOSTNAME}</td><td>${REVERSE_DNS}</td><td>${IP_ADDRESS}</td><td>${PORT}</td><td>${PROTOCOL}</td>${AVAILBILITY_STATUS}${SSL_STATUS}</tr>${NL}"
+			done
+			# Close up the html for the final table
+			HOST_TEST_TABLES+="    </table>${NL}"
+		}
+		
+		
+		APP_Installer_URL_ARRAY=(
+			#Device setup
+			"appinstallers-packages.services.jamfcloud.com,443,TCP, Connection Results"
+		)
+		CalculateHostInfoTablesAppInstallers 
+		createNetworkCheckTableAppInstallers
 	else
 		printf '<h2>App Installers</h2>' >> $results
 		printf '<code style="color: %s;">%s<br></code>' "orange" "App Installer Directory not found, device is not in scope for any App Installers or is not receiving the App Installer command from Jamf." >> $results
