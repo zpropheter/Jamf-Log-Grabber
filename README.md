@@ -18,6 +18,7 @@ Jamf Log Grabber is a bash based script that can be deployed manually, via Jamf 
 - Simplified Customization
 - Verbose results file for faster diagnostics
 - MDM Communication Information
+- Network checks for Jamf Remote Assist and App Installers
 - Inventory Troubleshooting: Checks for files left behind during a Jamf Recon command and provides a file name for further investigation
 - Jamf Connect License Check and troubleshooting
 - 3 Custom apps to configure for your own log gathering
@@ -42,5 +43,5 @@ When the script is ran, there will be a folder with your app name and the logs i
 
 <img src="https://i.imgur.com/LApTCKx.png" width="800" height="400" />
 
-If you do not see your app folder, it is because the file not found and the cleanup array removed the empty folder.
+If you do not see your app folder, it is because the file was not found and the cleanup array removed the empty folder.
 
