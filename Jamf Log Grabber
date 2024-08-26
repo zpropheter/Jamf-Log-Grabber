@@ -190,7 +190,7 @@ Connect() {
 		log show --style compact --predicate 'subsystem == "com.jamf.connect.login"' --debug > $connect/jamfconnect.login.log
 		kerblist=$("klist" 2>/dev/null)
 		if [[ "$kerblist" == "" ]];then
-			printf '<code style="color: %s;">%s<br></code>' "white" "-No Kerberos Ticket for Current Logged in User" > $connect/klist_manuallyCollected.txt; else
+			printf '<code style="color: %s;">%s<br></code>' "white" "-No Kerberos Ticket for Current Logged in User $loggedInUser" > $connect/klist_manuallyCollected.txt; else
 				echo $kerblist > $connect/klist_manuallyCollected.txt; 
 			fi
 		#CHECK FOR JAMF CONNECT LOGIN LOGS AND PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
