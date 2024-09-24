@@ -320,7 +320,7 @@ Protect() {
 	if [ -e /Library/Managed\ Preferences/com.jamf.protect.plist ]; then cp "/Library/Managed Preferences/com.jamf.protect.plist" "$security/com.jamf.protect.plist"
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Protect plist found" >> $results
 		plutil -convert xml1 "$security/com.jamf.protect.plist"
-		protectctl info > $security/jamfprotectinfo.log
+		protectctl info --verbose > $security/jamfprotectinfo.log
 		
 	else
 		printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Protect plist not found" >> $results
