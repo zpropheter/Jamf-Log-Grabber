@@ -175,6 +175,16 @@ Jamf() {
 	/usr/libexec/mdmclient AvailableOSUpdates > $JSS/AvailableOSUpdates.txt
 	/usr/libexec/mdmclient QueryDeviceInformation > $JSS/QueryDeviceInformation.txt
 	/usr/libexec/mdmclient DumpManagementStatus > $JSS/DumpManagementStatus.txt
+	launchctl dumpstate > $JSS/launchctl_dumpstate.txt
+	systemextensionsctl list > $JSS/system_extensions.txt
+	kextstat > $JSS/kextstat.txt
+	cp /Library/Receipts/InstallHistory.plist $JSS
+	if [ -e /Library/Logs/DiagnosticReports/ ]; then mkdir -p $JSS/DiagnosticReports && cp -r /Library/Logs/DiagnosticReports/ "$JSS/DiagnosticReports"
+		#SLEEP TO ALLOW COPY TO FINISH PROCESSING ALL FILES
+		sleep 5
+	else
+		printf '<code style="color: %s;">%s<br></code>' "red" "No crash reports found." >> $results
+	fi
 }
 
 
