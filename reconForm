@@ -1,0 +1,25 @@
+#!/bin/bash
+
+#This is for troubleshooting Recon issues where you may see errors in the jamf.log file such as 'Error running recon: Invalid Message - The message could not be parsed.'
+#BE CAREFUL nesting this inside of policies. You're calling a jamf process inside of a jamf process whether it's self service or via 'sudo jamf police -id ##' and can create MORE trouble.
+#Recommend running this on the device as a local file then running log grabber which will pick this up too.
+
+#Leave default variables if using Jamf Log Grabber in conjunction with this tool
+log_folder="$HOME/Desktop"
+outputFile="$log_folder/Recon/RawXMLReconForm"
+finalOutputFile="$log_folder/Recon/Recon.xml"
+
+reconForm() {
+	#Create reconForm
+	sudo jamf recon -saveFormTo $log_folder/Recon/
+	#Finds the file created so it can convert it
+	logFolderPath=$(find  $log_folder/Recon -name '*.reconForm')
+	#Echo for debugging file path
+	echo $logFolderPath
+	#Change to XML format
+	mv -- "$logFolderPath" "${outputFile%.reconForm}.xml" 
+	#Pretty print XML
+	xmllint -format "$outputFile".xml > $finalOutputFile
+}
+
+reconForm 
