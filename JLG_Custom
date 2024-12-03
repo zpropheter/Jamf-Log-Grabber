@@ -86,6 +86,9 @@ CustomApp3Name="$8"
 CustomApp3Folder=$log_folder/$CustomApp3Name
 CustomApp3LogSource="$9"
 #Now go down to CustomApp2Array and put in the files you want to grab
+
+echo $CustomApp1Name $CustomApp2Name $CustomApp3Name
+echo $CustomApp1Folder $CustomApp2Folder $CustomApp3Folder
 ####################################################################################################
 
 #Build a results file in HTML
