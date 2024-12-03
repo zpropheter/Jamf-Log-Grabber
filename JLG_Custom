@@ -87,8 +87,8 @@ CustomApp3Folder=$log_folder/$CustomApp3Name
 CustomApp3LogSource="$9"
 #Now go down to CustomApp2Array and put in the files you want to grab
 
-echo $CustomApp1Name $CustomApp2Name $CustomApp3Name
-echo $CustomApp1Folder $CustomApp2Folder $CustomApp3Folder
+echo "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name"
+echo "$CustomApp1Folder" "$CustomApp2Folder" "$CustomApp3Folder"
 ####################################################################################################
 
 #Build a results file in HTML
@@ -747,7 +747,7 @@ CustomApp1Array() {
 	mkdir -p $log_folder/$CustomApp1Name
 	if [ -e $CustomApp1LogSource ] && [ $CustomApp1LogSource != "/" ]; then cp -r $CustomApp1LogSource $CustomApp1Folder
 	else
-		printf '<h2>'$CustomApp1Name'</h2>' >> $results
+		printf '<h2>'"$CustomApp1Name"'</h2>' >> $results
 		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp1Name does not have a log file available to grab or was set to an invalid path." >> $results
 	fi
 }
