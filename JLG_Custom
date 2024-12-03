@@ -76,17 +76,11 @@ currenttime1=$(echo "$(currenttime)" | awk '{print $2}')
 
 echo "$4" "$5" "$6" "$7" "$8" "$9"
 
-CustomApp1Name="$4"
 CustomApp1Folder=$log_folder/$CustomApp1Name
-CustomApp1LogSource="$5"
 #Now go down to CustomApp1Array and put in the files you want to grab
-CustomApp2Name="$6"
 CustomApp2Folder=$log_folder/$CustomApp2Name
-CustomApp2LogSource="$7"
 #Now go down to CustomApp2Array and put in the files you want to grab
-CustomApp3Name="$8"
 CustomApp3Folder=$log_folder/$CustomApp3Name
-CustomApp3LogSource="$9"
 #Now go down to CustomApp2Array and put in the files you want to grab
 
 echo "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name"
