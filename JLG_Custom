@@ -74,17 +74,18 @@ currenttime1=$(echo "$(currenttime)" | awk '{print $2}')
 #You can add custom app log grabbing using the following rubric, just continue numbering the appnames or renaming them to fit your needs
 #You can pass jamf script variables as part of a policy to get your additional apps
 
-echo "$4" "$5" "$6" "$7" "$8" "$9"
-
+CustomApp1Name="$4"
 CustomApp1Folder=$log_folder/$CustomApp1Name
+CustomApp1LogSource="$5"
 #Now go down to CustomApp1Array and put in the files you want to grab
+CustomApp2Name="$6"
 CustomApp2Folder=$log_folder/$CustomApp2Name
+CustomApp2LogSource="$7"
 #Now go down to CustomApp2Array and put in the files you want to grab
+CustomApp3Name="$8"
 CustomApp3Folder=$log_folder/$CustomApp3Name
-#Now go down to CustomApp2Array and put in the files you want to grab
-
-echo "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name"
-echo "$CustomApp1Folder" "$CustomApp2Folder" "$CustomApp3Folder"
+CustomApp3LogSource="$9"
+#Now go down to CustomApp3Array and put in the files you want to grab
 ####################################################################################################
 
 #Build a results file in HTML
@@ -600,6 +601,22 @@ AppInstallers() {
 			/bin/cat << EOF >> "$results"  
 		<p />
 		<h2>App Installers</h2>
+		<h3>Failed App Installer Check</h3>
+		<p>The following files were found in the app installer logs and show failed installations. If you are troubleshooting failed App Installers, please examine the following files.</p>
+EOF
+			printf '<code style="color: %s;">%s<br></code>' "red" "Here's a list of failed app installer logs" >> $results
+			touch $App_Installers/commandUUID.txt
+			for file in $App_Installers/_Completed/*; do
+				failedInstall=$(defaults read "$file" InstallFailed 2> /dev/null)
+				commandUUID=$(defaults read "$file" InstallUUID 2> /dev/null)
+				if [[ $failedInstall == 1 ]]; then
+					printf '<code style="color: %s;">%s<br></code>' "yellow" "-$file" >> $results
+					echo "$commandUUID," >> $App_Installers/commandUUID.txt
+				fi
+			done
+			cat $App_Installers/commandUUID.txt  | tr '\n' ' ') > $App_Installers/commandUUID.txt
+			/bin/cat << EOF >> "$results"  
+		<p />
 		<p>Network access to the following hostname is required for using Jamf's App Installers.</p>
 ${HOST_TEST_TABLES}
 EOF
@@ -802,9 +819,9 @@ Zip_Folder() {
 }
 ####################################################################################################
 # Set the Arrays you want to grab.
-# Default Array is logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+# Default Array is logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "App_Installers" "Remote_Assist" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
-declare -a logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "Remote_Assist" "App_Installers" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+declare -a logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "App_Installers" "Remote_Assist" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
 ####################################################################################################
 # Put it all together in the Master Array
