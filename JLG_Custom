@@ -156,18 +156,18 @@ Jamf() {
 	else
 		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Self Service Logs not found" >> $results
 	fi
+	#Checks current MacOS Version against GDMF feed to make sure it is current and not a Beta build
+	currentMacOS=$(sw_vers --buildVersion)
+	checkIfSupportedOS=$(curl -s https://gdmf.apple.com/v2/pmv | grep -c $currentMacOS)
+	if [[ $checkIfSupportedOS == 1 ]]; then
+		printf '<code style="color: %s;">%s<br></code>' "white" "MacOS build $currentMacOS installed" >> $results
+	else
+		printf '<code style="color: %s;">%s<br></code>' "red" "Computer may be running Beta or unsupported MacOS Version. MacOS build $currentMacOS installed. Unable to locate in GDMF feed." >> $results
+	fi
 	#Parse through all agents and deamons for any running keyword "jamf" and are not a part of standard Jamf applications. If none are found, they are still printed 
-	AgentsAndDaemonsDirty=$(grep -r "jamf" ~/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/)
-	AgentsAndDaemonsClean=$(grep -r "jamf" /Users/$loggedInUser/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/ | grep -vw "com.jamf.connect.plist" | grep -vw "com.jamf.connect.login.plist" | grep -vw "com.jamf.connect.unlock.login.plist" | grep -vw "com.jamf.management.agent.plist" | grep -vw "com.jamf.connect.daemon.plist" | grep -vw "com.jamf.management.daemon.plist" | grep -vw "com.jamfsoftware.Composer.helper.plist" | grep -vw "com.jamfsoftware.task.1.plist" | grep -vw "com.jamf.cloudmonitor.plist" | grep -vw "com.jamf.remoteassist.connect.preloginagent.plist" | grep -vw "com.jamf.remoteassist.connect.userloginagent.plist" | grep -vw "com.jamf.remoteassist.connector.plist" | grep -vw "com.jamf.management.startup.plist") 
-	case $AgentsAndDaemonsClean in
-		"")
-			printf '<code style="color: %s;">%s<br></code>' "white" "A search for custom Agents and Daemons containing 'jamf' keywords has been ran. No matches other than standard Jamf Applications were located. For thorough diagnostics a list of all Agents and Daemons containing 'jamf' keyword in Client_Logs Folder. This includes standard Jamf Applications." >> $results
-			echo -e "$AgentsAndDaemonsDirty" > $JSS/AgentsAndDaemons.txt
-		;;
-		*)
-			printf '<code style="color: %s;">%s<br></code>' "orange" "The following Agents or Daemons were located and contain keyword 'jamf' $AgentsAndDaemonsClean" >> $results
-		;;
-	esac
+	AgentsAndDaemons=$(grep -r "jamf" /Users/$loggedInUser/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/)
+			printf '<code style="color: %s;">%s<br></code>' "white" "A search for custom Agents and Daemons containing 'jamf' keywords has been ran. " >> $results
+			echo -e "$AgentsAndDaemons" > $JSS/AgentsAndDaemons.txt
 	#read blocked applications in jamf
 	sudo cat /Library/Application\ Support/JAMF/.jmf_settings.json > $JSS/restricted_software.json
 	#show installed profiles and output to xml. Use this to compare profile settings against actual settings in Managed Preferences Folder
