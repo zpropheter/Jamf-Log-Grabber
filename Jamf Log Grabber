@@ -614,12 +614,12 @@ EOF
 				fi
 			done
 			cat $App_Installers/commandUUID.txt  | tr '\n' ' ' > $App_Installers/commandUUID.txt
-		}
-			/bin/cat << EOF >> "$results"  
+			/bin/cat << EOF >> "$results"
 		<p />		
 		<p>Network access to the following hostname is required for using Jamf's App Installers.</p>
 ${HOST_TEST_TABLES}
 EOF
+		}
 		function CalculateHostInfoTablesAppInstallers () {
 			echo "[step] Checking URLS"
 			lastCategory="zzzNone"  # Some fake category so we recognize that the first host is the start of a new category
@@ -737,8 +737,6 @@ EOF
 			# Close up the html for the final table
 			HOST_TEST_TABLES+="    </table>${NL}"
 		}
-		
-		
 		APP_Installer_URL_ARRAY=(
 			#Device setup
 			"appinstallers-packages.services.jamfcloud.com,443,TCP, Connection Results"
