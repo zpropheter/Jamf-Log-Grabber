@@ -166,7 +166,7 @@ Jamf() {
 	fi
 	#Parse through all agents and deamons for any running keyword "jamf" and are not a part of standard Jamf applications. If none are found, they are still printed 
 	AgentsAndDaemons=$(grep -r "jamf" /Users/$loggedInUser/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/)
-			printf '<code style="color: %s;">%s<br></code>' "white" "A search for custom Agents and Daemons containing 'jamf' keywords has been ran. " >> $results
+			printf '<code style="color: %s;">%s<br></code>' "white" "A search for custom Agents and Daemons containing 'jamf' keywords has been ran and a copy of the results can be found in the Client Logs folder. " >> $results
 			echo -e "$AgentsAndDaemons" > $JSS/AgentsAndDaemons.txt
 	#read blocked applications in jamf
 	sudo cat /Library/Application\ Support/JAMF/.jmf_settings.json > $JSS/restricted_software.json
