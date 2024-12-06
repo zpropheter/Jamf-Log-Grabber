@@ -596,7 +596,6 @@ EOF
 AppInstallers() {
 	mkdir -p $App_Installers
 	if [ -e /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/ ]; then cp -r /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/ directory $App_Installers
-		
 		function createNetworkCheckTableAppInstallers () {
 			/bin/cat << EOF >> "$results"  
 		<p />
@@ -614,15 +613,13 @@ EOF
 					echo "$commandUUID," >> $App_Installers/commandUUID.txt
 				fi
 			done
-			cat $App_Installers/commandUUID.txt  | tr '\n' ' ') > $App_Installers/commandUUID.txt
-
+			cat $App_Installers/commandUUID.txt  | tr '\n' ' ' > $App_Installers/commandUUID.txt
+		}
 			/bin/cat << EOF >> "$results"  
 		<p />		
 		<p>Network access to the following hostname is required for using Jamf's App Installers.</p>
 ${HOST_TEST_TABLES}
 EOF
-		}
-		
 		function CalculateHostInfoTablesAppInstallers () {
 			echo "[step] Checking URLS"
 			lastCategory="zzzNone"  # Some fake category so we recognize that the first host is the start of a new category
@@ -748,7 +745,7 @@ EOF
 		)
 		CalculateHostInfoTablesAppInstallers 
 		createNetworkCheckTableAppInstallers
-	else
+else
 		printf '<h2>App Installers</h2>' >> $results
 		printf '<code style="color: %s;">%s<br></code>' "orange" "App Installer Directory not found, device is not in scope for any App Installers or is not receiving the App Installer command from Jamf." >> $results
 	fi
