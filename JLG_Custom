@@ -85,7 +85,7 @@ CustomApp2LogSource="$7"
 CustomApp3Name="$8"
 CustomApp3Folder=$log_folder/$CustomApp3Name
 CustomApp3LogSource="$9"
-#Now go down to CustomApp3Array and put in the files you want to grab
+#Now go down to CustomApp2Array and put in the files you want to grab
 ####################################################################################################
 
 #Build a results file in HTML
@@ -596,7 +596,6 @@ EOF
 AppInstallers() {
 	mkdir -p $App_Installers
 	if [ -e /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/ ]; then cp -r /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/ directory $App_Installers
-		
 		function createNetworkCheckTableAppInstallers () {
 			/bin/cat << EOF >> "$results"  
 		<p />
@@ -614,14 +613,13 @@ EOF
 					echo "$commandUUID," >> $App_Installers/commandUUID.txt
 				fi
 			done
-			cat $App_Installers/commandUUID.txt  | tr '\n' ' ') > $App_Installers/commandUUID.txt
+			cat $App_Installers/commandUUID.txt  | tr '\n' ' ' > $App_Installers/commandUUID.txt
+		}
 			/bin/cat << EOF >> "$results"  
-		<p />
+		<p />		
 		<p>Network access to the following hostname is required for using Jamf's App Installers.</p>
 ${HOST_TEST_TABLES}
 EOF
-		}
-		
 		function CalculateHostInfoTablesAppInstallers () {
 			echo "[step] Checking URLS"
 			lastCategory="zzzNone"  # Some fake category so we recognize that the first host is the start of a new category
@@ -747,7 +745,7 @@ EOF
 		)
 		CalculateHostInfoTablesAppInstallers 
 		createNetworkCheckTableAppInstallers
-	else
+else
 		printf '<h2>App Installers</h2>' >> $results
 		printf '<code style="color: %s;">%s<br></code>' "orange" "App Installer Directory not found, device is not in scope for any App Installers or is not receiving the App Installer command from Jamf." >> $results
 	fi
@@ -760,7 +758,7 @@ CustomApp1Array() {
 	mkdir -p $log_folder/$CustomApp1Name
 	if [ -e $CustomApp1LogSource ] && [ $CustomApp1LogSource != "/" ]; then cp -r $CustomApp1LogSource $CustomApp1Folder
 	else
-		printf '<h2>'"$CustomApp1Name"'</h2>' >> $results
+		printf '<h2>'$CustomApp1Name'</h2>' >> $results
 		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp1Name does not have a log file available to grab or was set to an invalid path." >> $results
 	fi
 }
