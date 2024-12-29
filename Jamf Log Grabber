@@ -312,8 +312,8 @@ Connect() {
 			printf '<code style="color: %s;">%s<br></code>' "lime" "Key value assigned to LicenseFile uses data tag and does not appear to be affected by PI110629" >> $results
 		fi
 	}
-	connectLicenseArray 
 	if [[ $connectInstalled = "True" ]]; then
+	connectLicenseArray 
 	connectLoginLicenseArray 
 	connectLicenseFormatCheck
 	else
