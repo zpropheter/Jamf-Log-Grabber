@@ -195,6 +195,7 @@ Connect() {
 	printf '<code style="color: %s;">%s<br></code>' "white" "Checking for Jamf Connect" >> $results
 	if [ -e /Library/Managed\ Preferences/com.jamf.connect.plist ]; then
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Connect installed, collecting Jamf Connect logs..." >>$results
+		connectInstalled="True"
 		mkdir -p $log_folder/Connect
 		#OUTPUT ALL HISTORICAL JAMF CONNECT LOGS, THIS WILL ALWAYS GENERATE A LOG FILE EVEN IF CONNECT IS NOT INSTALLED
 		log show --style compact --predicate 'subsystem == "com.jamf.connect"' --debug > $connect/JamfConnect.log
@@ -250,6 +251,7 @@ Connect() {
 		fi
 	else
 		printf '<code style="color: %s;">%s<br></code>' "white" "-No Jamf Connect Installed, doing nothing" >> $results
+		connectInstalled="False"
 	fi
 	#CHECK THE JAMF CONNECT LICENSE FILE AND LOOK FOR OTHER PROFILES THAT MAY HAVE A JAMF CONNECT LICENSE
 	connectLicenseInstalled=$(defaults read $managed_preferences/com.jamf.connect.plist LicenseFile)
@@ -311,8 +313,12 @@ Connect() {
 		fi
 	}
 	connectLicenseArray 
+	if [[ $connectInstalled = "True" ]]; then
 	connectLoginLicenseArray 
 	connectLicenseFormatCheck
+	else
+		:
+	fi
 }
 
 
