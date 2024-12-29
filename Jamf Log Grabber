@@ -449,7 +449,10 @@ Remote_Assist() {
 	#ADD JAMF Remote Assist Log Folder
 	mkdir -p $JRA/Remote_Assist_Logs
 	JRA3Check=$(defaults read /Library/Application\ Support/JAMF/Remote\ Assist/jamfRemoteAssistConnectorUI.app/Contents/Info.plist CFBundleVersion 2>/dev/null)
-		printf '<h2>Jamf Remote Assist</h2>' >> $results
+	printf '<h2>Jamf Remote Assist</h2>' >> $results
+	if [[ $JRA3Check = "" ]]; then
+		printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Remote Assist not installed on this device. Exiting further log collection for JRA" >> $results
+	else
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist Version: $JRA3Check" >> $results
 		function createNetworkCheckTableJRA () {
 
@@ -591,7 +594,7 @@ EOF
 		createNetworkCheckTableJRA 
 		
 		log show --style compact --predicate 'subsystem BEGINSWITH "com.jamf.remoteassist"' --debug > $JRA/JRA_debug		
-
+	fi
 }
 
 ####################################################################################################
