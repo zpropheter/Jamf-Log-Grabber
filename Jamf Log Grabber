@@ -316,8 +316,6 @@ Connect() {
 	connectLicenseArray 
 	connectLoginLicenseArray 
 	connectLicenseFormatCheck
-	else
-		:
 	fi
 }
 
