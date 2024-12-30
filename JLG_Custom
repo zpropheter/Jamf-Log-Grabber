@@ -156,18 +156,18 @@ Jamf() {
 	else
 		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Self Service Logs not found" >> $results
 	fi
+	#Checks current MacOS Version against GDMF feed to make sure it is current and not a Beta build
+	currentMacOS=$(sw_vers --buildVersion)
+	checkIfSupportedOS=$(curl -s https://gdmf.apple.com/v2/pmv | grep -c $currentMacOS)
+	if [[ $checkIfSupportedOS == 1 ]]; then
+		printf '<code style="color: %s;">%s<br></code>' "white" "MacOS build $currentMacOS installed" >> $results
+	else
+		printf '<code style="color: %s;">%s<br></code>' "red" "Computer may be running Beta or unsupported MacOS Version. MacOS build $currentMacOS installed. Unable to locate in GDMF feed." >> $results
+	fi
 	#Parse through all agents and deamons for any running keyword "jamf" and are not a part of standard Jamf applications. If none are found, they are still printed 
-	AgentsAndDaemonsDirty=$(grep -r "jamf" ~/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/)
-	AgentsAndDaemonsClean=$(grep -r "jamf" /Users/$loggedInUser/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/ | grep -vw "com.jamf.connect.plist" | grep -vw "com.jamf.connect.login.plist" | grep -vw "com.jamf.connect.unlock.login.plist" | grep -vw "com.jamf.management.agent.plist" | grep -vw "com.jamf.connect.daemon.plist" | grep -vw "com.jamf.management.daemon.plist" | grep -vw "com.jamfsoftware.Composer.helper.plist" | grep -vw "com.jamfsoftware.task.1.plist" | grep -vw "com.jamf.cloudmonitor.plist" | grep -vw "com.jamf.remoteassist.connect.preloginagent.plist" | grep -vw "com.jamf.remoteassist.connect.userloginagent.plist" | grep -vw "com.jamf.remoteassist.connector.plist" | grep -vw "com.jamf.management.startup.plist") 
-	case $AgentsAndDaemonsClean in
-		"")
-			printf '<code style="color: %s;">%s<br></code>' "white" "A search for custom Agents and Daemons containing 'jamf' keywords has been ran. No matches other than standard Jamf Applications were located. For thorough diagnostics a list of all Agents and Daemons containing 'jamf' keyword in Client_Logs Folder. This includes standard Jamf Applications." >> $results
-			echo -e "$AgentsAndDaemonsDirty" > $JSS/AgentsAndDaemons.txt
-		;;
-		*)
-			printf '<code style="color: %s;">%s<br></code>' "orange" "The following Agents or Daemons were located and contain keyword 'jamf' $AgentsAndDaemonsClean" >> $results
-		;;
-	esac
+	AgentsAndDaemons=$(grep -r "jamf" /Users/$loggedInUser/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/)
+			printf '<code style="color: %s;">%s<br></code>' "white" "A search for custom Agents and Daemons containing 'jamf' keywords has been ran and a copy of the results can be found in the Client Logs folder." >> $results
+			echo -e "$AgentsAndDaemons" > $JSS/AgentsAndDaemons.txt
 	#read blocked applications in jamf
 	sudo cat /Library/Application\ Support/JAMF/.jmf_settings.json > $JSS/restricted_software.json
 	#show installed profiles and output to xml. Use this to compare profile settings against actual settings in Managed Preferences Folder
@@ -195,6 +195,7 @@ Connect() {
 	printf '<code style="color: %s;">%s<br></code>' "white" "Checking for Jamf Connect" >> $results
 	if [ -e /Library/Managed\ Preferences/com.jamf.connect.plist ]; then
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Connect installed, collecting Jamf Connect logs..." >>$results
+		connectInstalled="True"
 		mkdir -p $log_folder/Connect
 		#OUTPUT ALL HISTORICAL JAMF CONNECT LOGS, THIS WILL ALWAYS GENERATE A LOG FILE EVEN IF CONNECT IS NOT INSTALLED
 		log show --style compact --predicate 'subsystem == "com.jamf.connect"' --debug > $connect/JamfConnect.log
@@ -250,6 +251,7 @@ Connect() {
 		fi
 	else
 		printf '<code style="color: %s;">%s<br></code>' "white" "-No Jamf Connect Installed, doing nothing" >> $results
+		connectInstalled="False"
 	fi
 	#CHECK THE JAMF CONNECT LICENSE FILE AND LOOK FOR OTHER PROFILES THAT MAY HAVE A JAMF CONNECT LICENSE
 	connectLicenseInstalled=$(defaults read $managed_preferences/com.jamf.connect.plist LicenseFile)
@@ -310,9 +312,11 @@ Connect() {
 			printf '<code style="color: %s;">%s<br></code>' "lime" "Key value assigned to LicenseFile uses data tag and does not appear to be affected by PI110629" >> $results
 		fi
 	}
+	if [[ $connectInstalled = "True" ]]; then
 	connectLicenseArray 
 	connectLoginLicenseArray 
 	connectLicenseFormatCheck
+	fi
 }
 
 
@@ -445,7 +449,10 @@ Remote_Assist() {
 	#ADD JAMF Remote Assist Log Folder
 	mkdir -p $JRA/Remote_Assist_Logs
 	JRA3Check=$(defaults read /Library/Application\ Support/JAMF/Remote\ Assist/jamfRemoteAssistConnectorUI.app/Contents/Info.plist CFBundleVersion 2>/dev/null)
-		printf '<h2>Jamf Remote Assist</h2>' >> $results
+	printf '<h2>Jamf Remote Assist</h2>' >> $results
+	if [[ $JRA3Check = "" ]]; then
+		printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Remote Assist not installed on this device. Exiting further log collection for JRA" >> $results
+	else
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist Version: $JRA3Check" >> $results
 		function createNetworkCheckTableJRA () {
 
@@ -587,7 +594,7 @@ EOF
 		createNetworkCheckTableJRA 
 		
 		log show --style compact --predicate 'subsystem BEGINSWITH "com.jamf.remoteassist"' --debug > $JRA/JRA_debug		
-
+	fi
 }
 
 ####################################################################################################
@@ -614,12 +621,12 @@ EOF
 				fi
 			done
 			cat $App_Installers/commandUUID.txt  | tr '\n' ' ' > $App_Installers/commandUUID.txt
-		}
-			/bin/cat << EOF >> "$results"  
+			/bin/cat << EOF >> "$results"
 		<p />		
 		<p>Network access to the following hostname is required for using Jamf's App Installers.</p>
 ${HOST_TEST_TABLES}
 EOF
+		}
 		function CalculateHostInfoTablesAppInstallers () {
 			echo "[step] Checking URLS"
 			lastCategory="zzzNone"  # Some fake category so we recognize that the first host is the start of a new category
@@ -737,8 +744,6 @@ EOF
 			# Close up the html for the final table
 			HOST_TEST_TABLES+="    </table>${NL}"
 		}
-		
-		
 		APP_Installer_URL_ARRAY=(
 			#Device setup
 			"appinstallers-packages.services.jamfcloud.com,443,TCP, Connection Results"
