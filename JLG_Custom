@@ -195,6 +195,7 @@ Connect() {
 	printf '<code style="color: %s;">%s<br></code>' "white" "Checking for Jamf Connect" >> $results
 	if [ -e /Library/Managed\ Preferences/com.jamf.connect.plist ]; then
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Connect installed, collecting Jamf Connect logs..." >>$results
+		connectInstalled="True"
 		mkdir -p $log_folder/Connect
 		#OUTPUT ALL HISTORICAL JAMF CONNECT LOGS, THIS WILL ALWAYS GENERATE A LOG FILE EVEN IF CONNECT IS NOT INSTALLED
 		log show --style compact --predicate 'subsystem == "com.jamf.connect"' --debug > $connect/JamfConnect.log
@@ -250,6 +251,7 @@ Connect() {
 		fi
 	else
 		printf '<code style="color: %s;">%s<br></code>' "white" "-No Jamf Connect Installed, doing nothing" >> $results
+		connectInstalled="False"
 	fi
 	#CHECK THE JAMF CONNECT LICENSE FILE AND LOOK FOR OTHER PROFILES THAT MAY HAVE A JAMF CONNECT LICENSE
 	connectLicenseInstalled=$(defaults read $managed_preferences/com.jamf.connect.plist LicenseFile)
@@ -310,9 +312,11 @@ Connect() {
 			printf '<code style="color: %s;">%s<br></code>' "lime" "Key value assigned to LicenseFile uses data tag and does not appear to be affected by PI110629" >> $results
 		fi
 	}
+	if [[ $connectInstalled = "True" ]]; then
 	connectLicenseArray 
 	connectLoginLicenseArray 
 	connectLicenseFormatCheck
+	fi
 }
 
 
@@ -445,7 +449,10 @@ Remote_Assist() {
 	#ADD JAMF Remote Assist Log Folder
 	mkdir -p $JRA/Remote_Assist_Logs
 	JRA3Check=$(defaults read /Library/Application\ Support/JAMF/Remote\ Assist/jamfRemoteAssistConnectorUI.app/Contents/Info.plist CFBundleVersion 2>/dev/null)
-		printf '<h2>Jamf Remote Assist</h2>' >> $results
+	printf '<h2>Jamf Remote Assist</h2>' >> $results
+	if [[ $JRA3Check = "" ]]; then
+		printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Remote Assist not installed on this device. Exiting further log collection for JRA" >> $results
+	else
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist Version: $JRA3Check" >> $results
 		function createNetworkCheckTableJRA () {
 
@@ -587,7 +594,7 @@ EOF
 		createNetworkCheckTableJRA 
 		
 		log show --style compact --predicate 'subsystem BEGINSWITH "com.jamf.remoteassist"' --debug > $JRA/JRA_debug		
-
+	fi
 }
 
 ####################################################################################################
