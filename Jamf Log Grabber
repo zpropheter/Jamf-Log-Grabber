@@ -624,7 +624,7 @@ EOF
 				fi
 			done
 			if [[ $checkForAllFailedInstalls = "True" ]]; then
-				/bin/cat << EOF >> "$results"EOF
+				/bin/cat << EOF >> "$results"
 		<h3>Failed App Installer Check</h3>
 		<p>The following files were found in the app installer logs and show failed installations. If you are troubleshooting failed App Installers, please examine the following files.</p>
 EOF
@@ -640,7 +640,7 @@ EOF
 				done
 				cat $App_Installers/commandUUID.txt  | tr '\n' ' ' > $App_Installers/commandUUID.txt
 			else
-				/bin/cat << EOF >> "$results"EOF
+				/bin/cat << EOF >> "$results"
 		<h3>Failed App Installer Check</h3>
 		<p>No failed App Installer files found.</p>
 EOF
