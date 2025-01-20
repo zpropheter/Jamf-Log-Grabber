@@ -144,6 +144,11 @@ Jamf() {
 	else
 		printf '<code style="color: %s;">%s<br></code>' "red" "System Logs not found" >> $results
 	fi
+	#CHECK FOR JAMF SYSTEM LOGS
+	if [ -e /Library/Logs/MCXTools.log ]; then cp "/Library/Logs/MCXTools.log" $JSS
+	else
+		printf '<code style="color: %s;">%s<br></code>' "red" "System Logs not found" >> $results
+	fi
 	#FIND AND COPY JAMF SOFTWARE PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
 	#COPY DEBUG LOG
 	if [ -e /Library/Preferences/com.jamfsoftware.jamf.plist ]; then cp "/Library/Preferences/com.jamfsoftware.jamf.plist" "$JSS/com.jamfsoftware.jamf.plist" | plutil -convert xml1 "$JSS/com.jamfsoftware.jamf.plist" 
@@ -634,6 +639,11 @@ EOF
 					fi
 				done
 				cat $App_Installers/commandUUID.txt  | tr '\n' ' ' > $App_Installers/commandUUID.txt
+			else
+				/bin/cat << EOF >> "$results"EOF
+		<h3>Failed App Installer Check</h3>
+		<p>No failed App Installer files found.</p>
+EOF
 			fi
 			
 			/bin/cat << EOF >> "$results"
