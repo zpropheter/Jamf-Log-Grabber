@@ -454,7 +454,7 @@ Remote_Assist() {
 	JRA3Check=$(defaults read /Library/Application\ Support/JAMF/Remote\ Assist/jamfRemoteAssistConnectorUI.app/Contents/Info.plist CFBundleVersion 2>/dev/null)
 	printf '<h2>Jamf Remote Assist</h2>' >> $results
 	if [[ $JRA3Check = "" ]]; then
-		:
+		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist not installed, skipping version and network check." >> $results
 	else
 		#ADD JAMF Remote Assist Log Folder
 		mkdir -p $JRA/Remote_Assist_Logs
