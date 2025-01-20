@@ -446,13 +446,13 @@ DeviceCompliance() {
 ####################################################################################################
 #Array for Device Compliance
 Remote_Assist() {
-	#ADD JAMF Remote Assist Log Folder
-	mkdir -p $JRA/Remote_Assist_Logs
 	JRA3Check=$(defaults read /Library/Application\ Support/JAMF/Remote\ Assist/jamfRemoteAssistConnectorUI.app/Contents/Info.plist CFBundleVersion 2>/dev/null)
 	printf '<h2>Jamf Remote Assist</h2>' >> $results
 	if [[ $JRA3Check = "" ]]; then
-		printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Remote Assist not installed on this device. Exiting further log collection for JRA" >> $results
+		:
 	else
+		#ADD JAMF Remote Assist Log Folder
+		mkdir -p $JRA/Remote_Assist_Logs
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist Version: $JRA3Check" >> $results
 		function createNetworkCheckTableJRA () {
 
@@ -607,20 +607,35 @@ AppInstallers() {
 			/bin/cat << EOF >> "$results"  
 		<p />
 		<h2>App Installers</h2>
+EOF
+			#Gross for loop that checks for the first report of a failed install and sets the value to true. Avoids a blank return saying App Installer failures found but nothing listed. It is redundant but my limited scripting knowledge only allows for this workaround currently.
+			for file in $App_Installers/_Completed/*; do
+				failedInstall=$(defaults read "$file" InstallFailed 2> /dev/null)
+				if [[ $failedInstall == 1 ]]; then
+					checkForAllFailedInstalls="True"
+					break
+				else
+					checkForAllFailedInstalls="False"
+				fi
+			done
+			if [[ $checkForAllFailedInstalls = "True" ]]; then
+				/bin/cat << EOF >> "$results"EOF
 		<h3>Failed App Installer Check</h3>
 		<p>The following files were found in the app installer logs and show failed installations. If you are troubleshooting failed App Installers, please examine the following files.</p>
 EOF
-			printf '<code style="color: %s;">%s<br></code>' "red" "Here's a list of failed app installer logs" >> $results
-			touch $App_Installers/commandUUID.txt
-			for file in $App_Installers/_Completed/*; do
-				failedInstall=$(defaults read "$file" InstallFailed 2> /dev/null)
-				commandUUID=$(defaults read "$file" InstallUUID 2> /dev/null)
-				if [[ $failedInstall == 1 ]]; then
-					printf '<code style="color: %s;">%s<br></code>' "yellow" "-$file" >> $results
-					echo "$commandUUID," >> $App_Installers/commandUUID.txt
-				fi
-			done
-			cat $App_Installers/commandUUID.txt  | tr '\n' ' ' > $App_Installers/commandUUID.txt
+				printf '<code style="color: %s;">%s<br></code>' "red" "Here's a list of failed app installer logs" >> $results
+				touch $App_Installers/commandUUID.txt
+				for file in $App_Installers/_Completed/*; do
+					failedInstall=$(defaults read "$file" InstallFailed 2> /dev/null)
+					commandUUID=$(defaults read "$file" InstallUUID 2> /dev/null)
+					if [[ $failedInstall == 1 ]]; then
+						printf '<code style="color: %s;">%s<br></code>' "yellow" "-$file" >> $results
+						echo "$commandUUID," >> $App_Installers/commandUUID.txt
+					fi
+				done
+				cat $App_Installers/commandUUID.txt  | tr '\n' ' ' > $App_Installers/commandUUID.txt
+			fi
+			
 			/bin/cat << EOF >> "$results"
 		<p />		
 		<p>Network access to the following hostname is required for using Jamf's App Installers.</p>
