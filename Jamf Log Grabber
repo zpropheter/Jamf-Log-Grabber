@@ -886,31 +886,31 @@ logGrabberMasterArray() {
 		echo "$logs"
 		case $logs in
 			Jamf)
-				#Jamf 
+				Jamf 
 			;;
 			Protect)
 				Protect 
 			;;
 			Connect)
-				#Connect 
+				Connect 
 			;;
 			Recon_Troubleshoot)
-				#Recon_Troubleshoot 
+				Recon_Troubleshoot 
 			;;
 			MDM_Communication_Check)
-				#MDMCommunicationCheck 
+				MDMCommunicationCheck 
 			;;
 			Managed_Preferences)
-				#Managed_Preferences_Array 
+				Managed_Preferences_Array 
 			;;
 			Device_Compliance)
-				#DeviceCompliance 
+				DeviceCompliance 
 			;;
 			Remote_Assist)
-				#Remote_Assist  
+				Remote_Assist  
 			;;
 			App_Installers)
-				#AppInstallers 
+				AppInstallers 
 			;;
 			"$CustomApp1Name")
 				#Add or Remove comment from line below to disable or enable the array for the custom app
@@ -931,9 +931,9 @@ logGrabberMasterArray() {
 #Runs the Log Grabber as configured
 logGrabberMasterArray 
 #Run cleanup Array to remove empty folders
-#Cleanup
+Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
-#Zip_Folder 
+Zip_Folder 
 
 
 #Adding a new function/array
