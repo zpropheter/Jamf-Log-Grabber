@@ -1,8 +1,9 @@
 # Jamf Log Grabber
 ## _Get all the logs you'll ever need_
 
-# LIMITATIONS:
-# _This script is not intended for using to attach logs to a device record in Jamf Pro. Do not utilize such a workflow as it can lead to severe server performance issues_
+> [!CAUTION]
+> This script is not intended for using to attach logs to a device record in Jamf Pro. Do not utilize such a workflow as it can lead to severe server performance issues.
+
 
 Jamf Log Grabber is a bash based script that can be deployed manually, via Jamf MDM Policy, or as a Self Service Tool. It creates a zip folder on the user's desktop for upload to your service desk for troubleshooting.
 
@@ -12,6 +13,8 @@ Jamf Log Grabber is a bash based script that can be deployed manually, via Jamf 
 - App Installers
 - Multiple client side log diagnostics
 - Up to 3 custom apps
+
+
 
 
 ## Features
@@ -25,6 +28,9 @@ Jamf Log Grabber is a bash based script that can be deployed manually, via Jamf 
 - 3 Custom apps to configure for your own log gathering
 
 ## Installation
+
+> [!TIP]
+> You can use the method below to get the most up to date version of Jamf Log Grabber. If you want, you can also copy and paste the entire script to a scripts payload as outlined below, but it will be a static version instead.
 
 Create a Jamf Pro policy that runs the following bash script:
 - `curl -sSL https://jamf.it/get-logs | bash`
