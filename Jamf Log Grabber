@@ -425,6 +425,12 @@ Managed_Preferences_Array() {
 		#UNABLE TO CHECK FOLDER FOR WILDCARD PLIST LIKE *.PLIST
 		plutil -convert xml1 $managed_preferences/*.plist
 		plutil -convert xml1 $managed_preferences/$loggedInUser/*.plist
+		printf '<h2>Managed Preferences</h2>' >> $results
+		checkManagedNotifications=$(plutil -extract NotificationSettings xml1 -o - /Library/Managed\ Preferences/com.apple.notificationsettings.plist | grep "<key>BundleIdentifier</key>" -A 1 | grep "<string>" | sed -E 's|<string>(.*)</string>|\1|')
+		printf '<code style="color: %s;">%s<br></code>' "white" "Managed notifications found for the following applications:" >> $results
+		for app in $checkManagedNotifications; do
+			printf '<code style="color: %s;">\t%s\n<br></code>' "white" "- $app" >> $results
+		done
 	else
 		printf '<h2>Managed Preferences</h2>' >> $results
 		printf '<code style="color: %s;">%s<br></code>' "red" "No Managed Preferences plist files found" >> $results
