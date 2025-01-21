@@ -1,5 +1,4 @@
 # Jamf Log Grabber
-## _Get all the logs you'll ever need_
 
 > [!CAUTION]
 > This script is not intended for using to attach logs to a device record in Jamf Pro. Do not utilize such a workflow as it can lead to severe server performance issues.
