@@ -59,7 +59,6 @@ App_Installers=$log_folder/App_Installers
 jamfLog=$JSS/jamf.log
 
 reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
-runProtectDiagnostics="$8"
 protectDiagnostics=$(ls "$HOME/Desktop/" | grep "JamfProtectDiagnostics")
 
 
