@@ -624,7 +624,7 @@ EOF
 				fi
 			done
 			if [[ $checkForAllFailedInstalls = "True" ]]; then
-				/bin/cat << EOF >> "$results
+				/bin/cat << EOF >> "$results"
 		<h3>Failed App Installer Check</h3>
 		<p>The following files were found in the app installer logs and show failed installations. If you are troubleshooting failed App Installers, please examine the following files.</p>
 EOF
