@@ -60,6 +60,8 @@ jamfLog=$JSS/jamf.log
 
 reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
 runProtectDiagnostics="${10}"
+#for testing
+#runProtectDiagnostics="true"
 protectDiagnostics=$(ls "$HOME/Desktop/" | grep "JamfProtectDiagnostics")
 
 
@@ -337,11 +339,14 @@ Protect() {
 #		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been ran in the last 24 hours on this device." >> $results
 #	fi
 	shopt -s nocasematch
+	
 	case $runProtectDiagnostics in
 		true)
 			if [[ $protectDiagnostics == "" ]]; then 
 				echo "Protect Diagnostics enabled but no existing file found, creating file, please wait up to 5 minutes"
 				protectctl diagnostics -o $HOME/Desktop/ -d 5
+				#need to re-eval protect diagnostics so it sees the file
+				protectDiagnostics=$(ls "$HOME/Desktop/" | grep "JamfProtectDiagnostics")
 				cp "$HOME/Desktop/$protectDiagnostics" "$security"
 				printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files created. Please check Jamf_Security Folder for files." >> $results
 			else
@@ -902,31 +907,31 @@ logGrabberMasterArray() {
 		echo "$logs"
 		case $logs in
 			Jamf)
-				#Jamf 
+				Jamf 
 			;;
 			Protect)
 				Protect 
 			;;
 			Connect)
-				#Connect 
+				Connect 
 			;;
 			Recon_Troubleshoot)
-				#Recon_Troubleshoot 
+				Recon_Troubleshoot 
 			;;
 			MDM_Communication_Check)
-				#MDMCommunicationCheck 
+				MDMCommunicationCheck 
 			;;
 			Managed_Preferences)
-				#Managed_Preferences_Array 
+				Managed_Preferences_Array 
 			;;
 			Device_Compliance)
-				#DeviceCompliance 
+				DeviceCompliance 
 			;;
 			Remote_Assist)
-				#Remote_Assist  
+				Remote_Assist  
 			;;
 			App_Installers)
-				#AppInstallers 
+				AppInstallers 
 			;;
 			"$CustomApp1Name")
 				#Add or Remove comment from line below to disable or enable the array for the custom app
@@ -951,9 +956,9 @@ logGrabberMasterArray() {
 #Runs the Log Grabber as configured
 logGrabberMasterArray 
 #Run cleanup Array to remove empty folders
-#Cleanup
+Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
-#Zip_Folder 
+Zip_Folder 
 
 
 #Adding a new function/array
