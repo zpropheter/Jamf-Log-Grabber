@@ -160,10 +160,57 @@ Jamf() {
 	fi
 	mkdir -p $log_folder/Self_Service
 	#check for jamf self service logs
-	if [ -e /$HOME/Library/Logs/JAMF ]; then cp -r "$HOME/Library/Logs/JAMF/" $self_service
+	#build out case argument to get SS, SS+, or both when installed
+#	if [ -e /$HOME/Library/Logs/JAMF ]; then cp -r "$HOME/Library/Logs/JAMF/" $self_service
+#	else
+#		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Self Service Logs not found" >> $results
+#	fi
+	#Checks what versions of self service are installed 
+	if [ -e /Applications/Self\ Service.app ]; then 
+		og="true"
 	else
-		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Self Service Logs not found" >> $results
+		og="false"
 	fi
+	echo "$og"
+	if [[ -e /Applications/Self\ Service+.app ]]; then
+		ssPlus="true"
+	else
+		ssPlus="false"
+	fi
+	echo "$ssPlus"
+	#fun little logic to update selfServiceStatus variable to pull logs according to reporting
+	if [ $og == "true" ] && [ $ssPlus == "true" ]; then
+		selfServiceStatus="ogPlus"
+		echo "true/true"
+		echo $selfServiceStatus
+	elif [ $og == "true" ] && [ $ssPlus == "false" ]; then
+		selfServiceStatus="ogSS"
+		echo "true/false"
+	elif [ $og == "false" ] && [ $ssPlus == "true" ]; then
+		selfServiceStatus="ssPlus"
+		echo "false/true"
+	else
+		selfServiceStatus="notInstalled"
+		echo "not installed"
+	fi
+	#everything put together to pull SS, SS+, or both apps logs
+	case $selfServiceStatus in
+		ogPlus)
+			echo "Self Service and Self Service+ are installed on this machine"
+			cp -r "$HOME/Library/Logs/JAMF/" $self_service
+			log show --style compact --predicate 'subsystem == "com.jamf.selfserviceplus"' --debug --info > $self_service/SelfServicePlus.log
+		;;
+		ssplus)
+			echo "Self Service+ is installed on this machine"
+			log show --style compact --predicate 'subsystem == "com.jamf.selfserviceplus"' --debug --info > $self_service/SelfServicePlus.log
+		;;
+		ogSS)
+			echo "Self Service is installed on this machine"
+			cp -r "$HOME/Library/Logs/JAMF/" $self_service
+		;;
+		*)
+			echo "Self Service and Self Service+ are not installed on this machine"
+			esac
 	#Checks current MacOS Version against GDMF feed to make sure it is current and not a Beta build
 	currentMacOS=$(sw_vers --buildVersion)
 	checkIfSupportedOS=$(curl -s https://gdmf.apple.com/v2/pmv | grep -c $currentMacOS)
