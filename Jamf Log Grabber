@@ -59,6 +59,7 @@ App_Installers=$log_folder/App_Installers
 jamfLog=$JSS/jamf.log
 
 reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
+runProtectDiagnostics="${10}"
 protectDiagnostics=$(ls "$HOME/Desktop/" | grep "JamfProtectDiagnostics")
 
 
@@ -81,6 +82,10 @@ CustomApp1LogSource="$5"
 CustomApp2Name="$6"
 CustomApp2Folder=$log_folder/$CustomApp2Name
 CustomApp2LogSource="$7"
+#Now go down to CustomApp2Array and put in the files you want to grab
+CustomApp3Name="$8"
+CustomApp3Folder=$log_folder/$CustomApp3Name
+CustomApp3LogSource="$9"
 #Now go down to CustomApp2Array and put in the files you want to grab
 ####################################################################################################
 
@@ -832,6 +837,18 @@ CustomApp2Array() {
 }
 
 ####################################################################################################
+#Array for App Named in Dynamic Variables
+#When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
+CustomApp3Array() {
+	mkdir -p $log_folder/$CustomApp3Name
+	if [ -e $CustomApp3LogSource ] && [ $CustomApp3LogSource != "/" ]; then cp -r $CustomApp3LogSource $CustomApp3Folder
+	else
+		printf '<h2>'$CustomApp3Name'</h2>' >> $results
+		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp3Name does not have a log file available to grab or was set to an invalid path." >> $results
+	fi
+}
+
+####################################################################################################
 
 #Array for folder cleanup
 Cleanup() {
@@ -863,7 +880,7 @@ Zip_Folder() {
 # Set the Arrays you want to grab.
 # Default Array is logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "App_Installers" "Remote_Assist" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
-declare -a logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "App_Installers" "Remote_Assist" "$CustomApp1Name" "$CustomApp2Name")
+declare -a logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "App_Installers" "Remote_Assist" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
 
 ####################################################################################################
 # Put it all together in the Master Array
@@ -885,31 +902,31 @@ logGrabberMasterArray() {
 		echo "$logs"
 		case $logs in
 			Jamf)
-				Jamf 
+				#Jamf 
 			;;
 			Protect)
 				Protect 
 			;;
 			Connect)
-				Connect 
+				#Connect 
 			;;
 			Recon_Troubleshoot)
-				Recon_Troubleshoot 
+				#Recon_Troubleshoot 
 			;;
 			MDM_Communication_Check)
-				MDMCommunicationCheck 
+				#MDMCommunicationCheck 
 			;;
 			Managed_Preferences)
-				Managed_Preferences_Array 
+				#Managed_Preferences_Array 
 			;;
 			Device_Compliance)
-				DeviceCompliance 
+				#DeviceCompliance 
 			;;
 			Remote_Assist)
-				Remote_Assist  
+				#Remote_Assist  
 			;;
 			App_Installers)
-				AppInstallers 
+				#AppInstallers 
 			;;
 			"$CustomApp1Name")
 				#Add or Remove comment from line below to disable or enable the array for the custom app
@@ -918,6 +935,10 @@ logGrabberMasterArray() {
 			"$CustomApp2Name")
 				#Add or Remove comment from line below to disable or enable the array for the custom app
 				#CustomApp2Array  
+			;;
+			"$CustomApp3Name")
+				#Add or Remove comment from line below to disable or enable the array for the custom app
+				#CustomApp3Array  
 			;;
 			*)
 				echo "$logs is an invalid variable for the array. Check your spelling or add it to the case argument with your own array" >> $results
@@ -930,9 +951,9 @@ logGrabberMasterArray() {
 #Runs the Log Grabber as configured
 logGrabberMasterArray 
 #Run cleanup Array to remove empty folders
-Cleanup
+#Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
-Zip_Folder 
+#Zip_Folder 
 
 
 #Adding a new function/array
