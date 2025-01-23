@@ -383,7 +383,7 @@ Protect() {
 	printf '<h2>Jamf Protect</h2>' >> $results
 	#CHECK FOR JAMF PROTECT DIAGNOSTICS FOLDER, THEN COPY IF PRESENT
 #	if [[ $protectDiagnostics != "" ]]; then cp -r "$HOME/Desktop/$protectDiagnostics" "$security"
-#		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been ran in the last 24 hours on this device." >> $results
+#		printf '<code style="color: %s;">%s<br></code>' "red" "A 'protectctl diagnostics' command has been previously ran and the diagnostics folder was found on the desktop of this device." >> $results
 #	fi
 	shopt -s nocasematch
 	
@@ -399,14 +399,14 @@ Protect() {
 			else
 				echo "Protect Diagnostics found, copying to Jamf Log Grabber"
 				cp "$HOME/Desktop/$protectDiagnostics" "$security"
-				printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been ran in the last 24 hours on this device." >> $results
+				printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been previously ran and the diagnostics folder was found on the desktop of this device." >> $results
 			fi
 		;;
 		*)
 			if [[ $protectDiagnostics != "" ]]; then 
 				echo "Protect Diagnostics found, copying to Jamf Log Grabber"
 				cp "$HOME/Desktop/$protectDiagnostics" "$security"
-				printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been ran in the last 24 hours on this device." >> $results
+				printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been previously ran and the diagnostics folder was found on the desktop of this device." >> $results
 			else
 				echo "Protect Diagnostics disabled and no copy found on desktop"
 			fi
