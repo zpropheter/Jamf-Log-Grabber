@@ -76,7 +76,7 @@ currenttime1=$(echo "$(currenttime)" | awk '{print $2}')
 
 #CustomApp1Name=$4
 CustomApp1Folder=$log_folder/$CustomApp1Name
-CustomApp1LogSource="$5"
+#CustomApp1LogSource="$5"
 #Now go down to CustomApp1Array and put in the files you want to grab
 #CustomApp2Name="$6"
 CustomApp2Folder=$log_folder/$CustomApp2Name
