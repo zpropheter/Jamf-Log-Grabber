@@ -59,6 +59,9 @@ App_Installers=$log_folder/App_Installers
 jamfLog=$JSS/jamf.log
 
 reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
+runProtectDiagnostics="${10}"
+#for testing
+#runProtectDiagnostics="true"
 protectDiagnostics=$(ls "$HOME/Desktop/" | grep "JamfProtectDiagnostics")
 
 
@@ -157,18 +160,105 @@ Jamf() {
 	fi
 	mkdir -p $log_folder/Self_Service
 	#check for jamf self service logs
-	if [ -e /$HOME/Library/Logs/JAMF ]; then cp -r "$HOME/Library/Logs/JAMF/" $self_service
+	#build out case argument to get SS, SS+, or both when installed
+#	if [ -e /$HOME/Library/Logs/JAMF ]; then cp -r "$HOME/Library/Logs/JAMF/" $self_service
+#	else
+#		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Self Service Logs not found" >> $results
+#	fi
+	#Checks what versions of self service are installed 
+	if [ -e /Applications/Self\ Service.app ]; then 
+		og="true"
 	else
-		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Self Service Logs not found" >> $results
+		og="false"
 	fi
-	#Checks current MacOS Version against GDMF feed to make sure it is current and not a Beta build
+	echo "$og"
+	if [[ -e /Applications/Self\ Service+.app ]]; then
+		ssPlus="true"
+	else
+		ssPlus="false"
+	fi
+	echo "$ssPlus"
+	#fun little logic to update selfServiceStatus variable to pull logs according to reporting
+	if [ $og == "true" ] && [ $ssPlus == "true" ]; then
+		selfServiceStatus="ogPlus"
+		echo "true/true"
+		echo $selfServiceStatus
+	elif [ $og == "true" ] && [ $ssPlus == "false" ]; then
+		selfServiceStatus="ogSS"
+		echo "true/false"
+	elif [ $og == "false" ] && [ $ssPlus == "true" ]; then
+		selfServiceStatus="ssPlus"
+		echo "false/true"
+	else
+		selfServiceStatus="notInstalled"
+		echo "not installed"
+	fi
+	#everything put together to pull SS, SS+, or both apps logs
+	case $selfServiceStatus in
+		ogPlus)
+			echo "Self Service and Self Service+ are installed on this machine"
+			cp -r "$HOME/Library/Logs/JAMF/" $self_service
+			log show --style compact --predicate 'subsystem == "com.jamf.selfserviceplus"' --debug --info > $self_service/SelfServicePlus.log
+		;;
+		ssplus)
+			echo "Self Service+ is installed on this machine"
+			log show --style compact --predicate 'subsystem == "com.jamf.selfserviceplus"' --debug --info > $self_service/SelfServicePlus.log
+		;;
+		ogSS)
+			echo "Self Service is installed on this machine"
+			cp -r "$HOME/Library/Logs/JAMF/" $self_service
+		;;
+		*)
+			echo "Self Service and Self Service+ are not installed on this machine"
+			esac
+	#Checks current MacOS Version against GDMF feed and flags if not a current release
 	currentMacOS=$(sw_vers --buildVersion)
 	checkIfSupportedOS=$(curl -s https://gdmf.apple.com/v2/pmv | grep -c $currentMacOS)
 	if [[ $checkIfSupportedOS == 1 ]]; then
 		printf '<code style="color: %s;">%s<br></code>' "white" "MacOS build $currentMacOS installed" >> $results
 	else
-		printf '<code style="color: %s;">%s<br></code>' "red" "Computer may be running Beta or unsupported MacOS Version. MacOS build $currentMacOS installed. Unable to locate in GDMF feed." >> $results
+		printf '<code style="color: %s;">%s<br></code>' "red" "MacOS build $currentMacOS installed. Unable to locate in GDMF feed." >> $results
 	fi
+	#Check if account is a Mobile Account and report if so
+	NETACCLIST=$(dscl . list /Users OriginalNodeName | awk '{print $1}' 2>/dev/null)
+	if [ "$NETACCLIST" == "" ]; then
+		printf '<code style="color: %s;">%s<br></code>' "white" "No mobile accounts on device." >> $results
+	else
+		printf '<code style="color: %s;">%s<br></code>' "red" "$NETACCLIST is a mobile account." >> $results
+	fi
+	#############################################
+	#            Software Update Stuff          #
+	#############################################
+	#Show Secure Token enabled users
+	checkForSecureTokenUsers=$(fdesetup list | sed -E 's/,[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}//g')
+			if [[ $checkForSecureTokenUsers == "" ]]; then
+				printf '<code style="color: %s;">%s<br></code>' "red" "No Secure Token Users Found" >> $results
+			else
+				printf '<code style="color: %s;">%s<br></code>' "white" "Secure Token Users are: $checkForSecureTokenUsers" >> $results
+			fi
+	#Get info.plist that would be relayed to server for comparison
+	mkdir -p $JSS/SoftwareUpdates
+			if [[ -e /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/SoftwareUpdateSubscriber.xpc/Contents/Info.plist ]]; then 
+				cp /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/SoftwareUpdateSubscriber.xpc/Contents/Info.plist $JSS/SoftwareUpdates/ClientInfo.plist
+			else 
+				printf '<code style="color: %s;">%s<br></code>' "red" "Unable to find SoftwareUpdate info.plist" >> $results
+			fi
+				if [[ -e /private/var/db/softwareupdate/SoftwareUpdateDDMStatePersistence.plist ]]; then 
+				/private/var/db/softwareupdate/SoftwareUpdateDDMStatePersistence.plist > $JSS/SoftwareUpdates/DDM.plist
+			else 
+				printf '<code style="color: %s;">%s<br></code>' "red" "Unable to find Software Update DDM plist" >> $results
+			fi
+	#############################################
+	#        	    DDM Info   			        #
+	#############################################
+	#Copy the current declaration info.plists for reference
+	DDMInfoPlists=$(ls /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/ | grep -Ewv 'SoftwareUpdateSubscriber.xpc')
+		mkdir -p $JSS/DDM
+			for file in $DDMInfoPlists; do
+				if [[ -e /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/$file/Contents/info.plist ]]; then
+					cp /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/$file/Contents/info.plist $JSS/DDM/"$file"_info.plist
+				fi
+			done
 	#Parse through all agents and deamons for any running keyword "jamf" and are not a part of standard Jamf applications. If none are found, they are still printed 
 	AgentsAndDaemons=$(grep -r "jamf" /Users/$loggedInUser/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/)
 			printf '<code style="color: %s;">%s<br></code>' "white" "A search for custom Agents and Daemons containing 'jamf' keywords has been ran and a copy of the results can be found in the Client Logs folder." >> $results
@@ -177,7 +267,7 @@ Jamf() {
 	sudo cat /Library/Application\ Support/JAMF/.jmf_settings.json > $JSS/restricted_software.json
 	#show installed profiles and output to xml. Use this to compare profile settings against actual settings in Managed Preferences Folder
 	sudo profiles show -output $JSS/profiles.xml stdout-xml	
-	/usr/libexec/mdmclient AvailableOSUpdates > $JSS/AvailableOSUpdates.txt
+	/usr/libexec/mdmclient AvailableOSUpdates > $JSS/SoftwareUpdates/AvailableOSUpdates.txt
 	/usr/libexec/mdmclient QueryDeviceInformation > $JSS/QueryDeviceInformation.txt
 	/usr/libexec/mdmclient DumpManagementStatus > $JSS/DumpManagementStatus.txt
 	launchctl dumpstate > $JSS/launchctl_dumpstate.txt
@@ -332,9 +422,36 @@ Protect() {
 	mkdir -p $log_folder/Jamf_Security
 	printf '<h2>Jamf Protect</h2>' >> $results
 	#CHECK FOR JAMF PROTECT DIAGNOSTICS FOLDER, THEN COPY IF PRESENT
-	if [[ $protectDiagnostics != "" ]]; then cp -r "$HOME/Desktop/$protectDiagnostics" "$security"
-		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been ran in the last 24 hours on this device." >> $results
-	fi
+#	if [[ $protectDiagnostics != "" ]]; then cp -r "$HOME/Desktop/$protectDiagnostics" "$security"
+#		printf '<code style="color: %s;">%s<br></code>' "red" "A 'protectctl diagnostics' command has been previously ran and the diagnostics folder was found on the desktop of this device." >> $results
+#	fi
+	shopt -s nocasematch
+	
+	case $runProtectDiagnostics in
+		true)
+			if [[ $protectDiagnostics == "" ]]; then 
+				echo "Protect Diagnostics enabled but no existing file found, creating file, please wait up to 5 minutes"
+				protectctl diagnostics -o $HOME/Desktop/ -d 5
+				#need to re-eval protect diagnostics so it sees the file
+				protectDiagnostics=$(ls "$HOME/Desktop/" | grep "JamfProtectDiagnostics")
+				cp "$HOME/Desktop/$protectDiagnostics" "$security"
+				printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files created. Please check Jamf_Security Folder for files." >> $results
+			else
+				echo "Protect Diagnostics found, copying to Jamf Log Grabber"
+				cp "$HOME/Desktop/$protectDiagnostics" "$security"
+				printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been previously ran and the diagnostics folder was found on the desktop of this device." >> $results
+			fi
+		;;
+		*)
+			if [[ $protectDiagnostics != "" ]]; then 
+				echo "Protect Diagnostics found, copying to Jamf Log Grabber"
+				cp "$HOME/Desktop/$protectDiagnostics" "$security"
+				printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been previously ran and the diagnostics folder was found on the desktop of this device." >> $results
+			else
+				echo "Protect Diagnostics disabled and no copy found on desktop"
+			fi
+		;;
+	esac
 	#CHECK FOR JAMF PROTECT PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
 	if [ -e /Library/Managed\ Preferences/com.jamf.protect.plist ]; then cp "/Library/Managed Preferences/com.jamf.protect.plist" "$security/com.jamf.protect.plist"
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Protect plist found" >> $results
@@ -425,6 +542,12 @@ Managed_Preferences_Array() {
 		#UNABLE TO CHECK FOLDER FOR WILDCARD PLIST LIKE *.PLIST
 		plutil -convert xml1 $managed_preferences/*.plist
 		plutil -convert xml1 $managed_preferences/$loggedInUser/*.plist
+		printf '<h2>Managed Preferences</h2>' >> $results
+		checkManagedNotifications=$(plutil -extract NotificationSettings xml1 -o - /Library/Managed\ Preferences/com.apple.notificationsettings.plist | grep "<key>BundleIdentifier</key>" -A 1 | grep "<string>" | sed -E 's|<string>(.*)</string>|\1|')
+		printf '<code style="color: %s;">%s<br></code>' "white" "Managed notifications found for the following applications:" >> $results
+		for app in $checkManagedNotifications; do
+			printf '<code style="color: %s;">\t%s\n<br></code>' "white" "- $app" >> $results
+		done
 	else
 		printf '<h2>Managed Preferences</h2>' >> $results
 		printf '<code style="color: %s;">%s<br></code>' "red" "No Managed Preferences plist files found" >> $results
