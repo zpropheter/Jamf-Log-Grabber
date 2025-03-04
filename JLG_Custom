@@ -224,7 +224,10 @@ Jamf() {
 	if [ "$NETACCLIST" == "" ]; then
 		printf '<code style="color: %s;">%s<br></code>' "white" "No mobile accounts on device." >> $results
 	else
-		printf '<code style="color: %s;">%s<br></code>' "red" "$NETACCLIST is a mobile account." >> $results
+		printf '<code style="color: %s;">%s<br></code>' "red" "The following are mobile accounts:" >> $results 
+		for account in $NETACCLIST; do
+			printf '<code style="color:red %s; white-space:pre;">&#9;'$account'<br></code>' >> $results 
+		done
 	fi
 	#############################################
 	#            Software Update Stuff          #
