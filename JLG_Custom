@@ -77,7 +77,7 @@ currenttime1=$(echo "$(currenttime)" | awk '{print $2}')
 #You can add custom app log grabbing using the following rubric, just continue numbering the appnames or renaming them to fit your needs
 #You can pass jamf script variables as part of a policy to get your additional apps
 
-#CustomApp1Name="$4"
+#CustomApp1Name=$4
 CustomApp1Folder=$log_folder/$CustomApp1Name
 #CustomApp1LogSource="$5"
 #Now go down to CustomApp1Array and put in the files you want to grab
