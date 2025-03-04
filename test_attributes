@@ -1,0 +1,8 @@
+#!/bin/bash
+
+echo "testing jamf pro variables" > $HOME/Desktop/test.txt
+echo "4 is $4" >> $HOME/Desktop/test.txt
+echo "5 is $5" >> $HOME/Desktop/test.txt
+echo "6 is $6" >> $HOME/Desktop/test.txt
+echo "7 is $7" >> $HOME/Desktop/test.txt
+echo "arg1 is $4 or $ARG1" >> $HOME/Desktop/test.txt
