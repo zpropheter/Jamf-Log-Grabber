@@ -583,7 +583,6 @@ Remote_Assist() {
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist not installed, skipping version and network check." >> $results
 	else
 		#ADD JAMF Remote Assist Log Folder
-		mkdir -p $JRA/Remote_Assist_Logs
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist Version: $JRA3Check" >> $results
 		function createNetworkCheckTableJRA () {
 
