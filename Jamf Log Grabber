@@ -1,10 +1,8 @@
 #!/bin/bash
 
-#Jamf Log Grabber is designed to collect any logs associated with Jamf Products as well as MDM Managed Preferences.
-#Jamf Products currently supported: Jamf Binary (including Recon Troubleshooting), Jamf Connect, Jamf Security (Protect and Trust), App Installers, and Jamf Remote Assist
-#Log Grabber 2.0 revamp started 11/18/23 to design a more easy to customize workflow for grabbing logs
+#Jamf Log Grabber is designed to collect any logs associated with Jamf managed devices.
 
-#Arrays are now set for each individual type of log. Simply add or remove array names to call them in the script (Line 278)
+#Custom arrays are now set for each individual type of log. It is recommended to include all as there are minor dependencies for some arrays.
 #This new workflow allows for you to add arrays for additional in house apps like SUPER, DEPNOTIFY, Crowdstrike, or any other commonly used MacOS applications.
 
 ####################################################################################################
@@ -159,12 +157,6 @@ Jamf() {
 		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Software plist not found" >> $results
 	fi
 	mkdir -p $log_folder/Self_Service
-	#check for jamf self service logs
-	#build out case argument to get SS, SS+, or both when installed
-#	if [ -e /$HOME/Library/Logs/JAMF ]; then cp -r "$HOME/Library/Logs/JAMF/" $self_service
-#	else
-#		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Self Service Logs not found" >> $results
-#	fi
 	#Checks what versions of self service are installed 
 	if [ -e /Applications/Self\ Service.app ]; then 
 		og="true"
@@ -424,10 +416,6 @@ Protect() {
 	#MAKE DIRECTORY FOR ALL JAMF SECURITY RELATED FILES
 	mkdir -p $log_folder/Jamf_Security
 	printf '<h2>Jamf Protect</h2>' >> $results
-	#CHECK FOR JAMF PROTECT DIAGNOSTICS FOLDER, THEN COPY IF PRESENT
-#	if [[ $protectDiagnostics != "" ]]; then cp -r "$HOME/Desktop/$protectDiagnostics" "$security"
-#		printf '<code style="color: %s;">%s<br></code>' "red" "A 'protectctl diagnostics' command has been previously ran and the diagnostics folder was found on the desktop of this device." >> $results
-#	fi
 	shopt -s nocasematch
 	
 	case $runProtectDiagnostics in
@@ -1048,12 +1036,3 @@ logGrabberMasterArray
 Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
 Zip_Folder 
-
-
-#Adding a new function/array
-#1. Create a variable in the standard variable declarations
-#2. Build your function at the end of the list. Insert just above `CustomApp1Array`. Make sure to include outputs to the $results file for what the function is doing
-#3. In the cleanup function, add your folder name to the list of folders in the $cleanup variable
-#4. In $logsToGrab, add the name of your app array so that the logGrabberMasterArray knows to run it
-#5. In `logGrabberMasterArray` edit the `case` function to add a case that matches what you put in $logsToGrab and then put the name of the function to run below, it should be self explanatory as you look at the case function
-#6. Run multiple tests to confirm that the whole script runs with everything in it and confirm the results are as expected
