@@ -10,7 +10,7 @@ Jamf Log Grabber is a bash based script that can be deployed manually, via Jamf 
 - All Jamf Applications
 - Device Compliance
 - App Installers
-- Multiple client side log diagnostics
+- Multiple client side diagnostics
 - Up to 3 custom apps
 
 
