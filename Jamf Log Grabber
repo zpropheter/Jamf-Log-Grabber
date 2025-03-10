@@ -57,7 +57,7 @@ App_Installers=$log_folder/App_Installers
 jamfLog=$JSS/jamf.log
 
 reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
-#runProtectDiagnostics="${10}"
+runProtectDiagnostics="${10}"
 #for testing
 #runProtectDiagnostics="true"
 protectDiagnostics=$(ls "$HOME/Desktop/" | grep "JamfProtectDiagnostics")
@@ -163,17 +163,14 @@ Jamf() {
 	else
 		og="false"
 	fi
-	echo "$og"
 	if [[ -e /Applications/Self\ Service+.app ]]; then
 		ssPlus="true"
 	else
 		ssPlus="false"
 	fi
-	echo "$ssPlus"
 	#fun little logic to update selfServiceStatus variable to pull logs according to reporting
 	if [ $og == "true" ] && [ $ssPlus == "true" ]; then
 		selfServiceStatus="ogPlus"
-		echo $selfServiceStatus
 	elif [ $og == "true" ] && [ $ssPlus == "false" ]; then
 		selfServiceStatus="ogSS"
 	elif [ $og == "false" ] && [ $ssPlus == "true" ]; then
