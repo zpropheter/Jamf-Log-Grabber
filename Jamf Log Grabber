@@ -1,1034 +1,1034 @@
-	#!/bin/bash
-	
-	#Jamf Log Grabber is designed to collect any logs associated with Jamf managed devices.
-	
-	#Custom arrays are now set for each individual type of log. It is recommended to include all as there are minor dependencies for some arrays.
-	#This new workflow allows for you to add arrays for additional in house apps like SUPER, DEPNOTIFY, Crowdstrike, or any other commonly used MacOS applications.
-	
-	####################################################################################################
-	#This script is not intended for using to attach logs to a device record in Jamf Pro. Do not utilize such a workflow as it can lead to severe server performance issues
-	####################################################################################################
-	
-	# Redistribution and use in source and binary forms, with or without
-	# modification, are permitted provided that the following conditions are met:
-	#        * Redistributions of source code must retain the above copyright
-	#         notice, this list of conditions and the following disclaimer.
-	#      * Redistributions in binary form must reproduce the above copyright
-	#           notice, this list of conditions and the following disclaimer in the
-	#           documentation and/or other materials provided with the distribution.
-	#         * Neither the name of the JAMF Software, LLC nor the
-	#           names of its contributors may be used to endorse or promote products
-	#           derived from this software without specific prior written permission.
-	# THIS SOFTWARE IS PROVIDED BY JAMF SOFTWARE, LLC "AS IS" AND ANY
-	# EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-	# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-	# DISCLAIMED. IN NO EVENT SHALL JAMF SOFTWARE, LLC BE LIABLE FOR ANY
-	# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-	# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-	# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-	# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-	# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-	# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-	
-	####################################################################################################
-	
-	#DATE FOR LOG FOLDER ZIP CREATION
-	current_date=$(date +"%Y-%m-%d")
-	#HARD CODED VARIABLES, DO NOT CHANGE
-	loggedInUser=$( echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }' )
-	#### Error check to make sure environment variables are correctly set as multiple recent reports in early 2024 had this broken
-	echo "HOME is $HOME"
-	if [[ $HOME == "" ]]; then
-		HOME="/Users/$loggedInUser"
+#!/bin/bash
+
+#Jamf Log Grabber is designed to collect any logs associated with Jamf managed devices.
+
+#Custom arrays are now set for each individual type of log. It is recommended to include all as there are minor dependencies for some arrays.
+#This new workflow allows for you to add arrays for additional in house apps like SUPER, DEPNOTIFY, Crowdstrike, or any other commonly used MacOS applications.
+
+####################################################################################################
+#This script is not intended for using to attach logs to a device record in Jamf Pro. Do not utilize such a workflow as it can lead to severe server performance issues
+####################################################################################################
+
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#        * Redistributions of source code must retain the above copyright
+#         notice, this list of conditions and the following disclaimer.
+#      * Redistributions in binary form must reproduce the above copyright
+#           notice, this list of conditions and the following disclaimer in the
+#           documentation and/or other materials provided with the distribution.
+#         * Neither the name of the JAMF Software, LLC nor the
+#           names of its contributors may be used to endorse or promote products
+#           derived from this software without specific prior written permission.
+# THIS SOFTWARE IS PROVIDED BY JAMF SOFTWARE, LLC "AS IS" AND ANY
+# EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL JAMF SOFTWARE, LLC BE LIABLE FOR ANY
+# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+####################################################################################################
+
+#DATE FOR LOG FOLDER ZIP CREATION
+current_date=$(date +"%Y-%m-%d")
+#HARD CODED VARIABLES, DO NOT CHANGE
+loggedInUser=$( echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }' )
+#### Error check to make sure environment variables are correctly set as multiple recent reports in early 2024 had this broken
+echo "HOME is $HOME"
+if [[ $HOME == "" ]]; then
+	HOME="/Users/$loggedInUser"
+fi
+echo $HOME
+#### End of HOME check
+log_folder=$HOME/Desktop/"$loggedInUser"_"$current_date"_logs
+results=$log_folder/Results.html
+JSS=$log_folder/Client_Logs
+security=$log_folder/Jamf_Security
+connect=$log_folder/Connect
+managed_preferences=$log_folder/Managed_Preferences
+recon=$log_folder/Recon
+self_service=$log_folder/Self_Service
+Device_Compliance=$log_folder/Device_Compliance
+JRA=$log_folder/JRA
+App_Installers=$log_folder/App_Installers
+jamfLog=$JSS/jamf.log
+
+reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
+runProtectDiagnostics="${10}"
+#for testing
+#runProtectDiagnostics="true"
+protectDiagnostics=$(ls "$HOME/Desktop/" | grep "JamfProtectDiagnostics")
+
+
+
+#DATE AND TIME FOR RESULTS.TXT INFORMATION
+#currenttime=$(date +"%D %T")
+currenttime() {
+	date +"%D %T"
+}
+currenttime1=$(echo "$(currenttime)" | awk '{print $2}')
+
+####################################################################################################
+#You can add custom app log grabbing using the following rubric, just continue numbering the appnames or renaming them to fit your needs
+#You can pass jamf script variables as part of a policy to get your additional apps
+
+#CustomApp1Name=$4
+CustomApp1Folder=$log_folder/$CustomApp1Name
+#CustomApp1LogSource="$5"
+#Now go down to CustomApp1Array and put in the files you want to grab
+#CustomApp2Name="$6"
+CustomApp2Folder=$log_folder/$CustomApp2Name
+#CustomApp2LogSource="$7"
+#Now go down to CustomApp2Array and put in the files you want to grab
+#CustomApp3Name="$8"
+CustomApp3Folder=$log_folder/$CustomApp3Name
+#CustomApp3LogSource="$9"
+#Now go down to CustomApp2Array and put in the files you want to grab
+####################################################################################################
+
+#Build a results file in HTML
+buildHTMLResults() {
+	printf '<html>
+	<head>  
+		<style type="text/css">
+			body { background-color:#444444;font-family:Helvetica,Arial,sans-serif;margin:20px; }
+			h1 { margin-top:1em;margin-bottom:0.2em;color:#9eb8d5 }
+			h2 { margin-top:1em;margin-bottom:0.2em;color:#37bb9a }
+			h3 { margin-top:0.8em;margin-bottom:0.2em;color:#37bb9a }
+			h4 { margin-top:0.8em;margin-bottom:0.2em;color:#37bb9a }
+			p { margin-top:0.2em;margin-bottom:0.2em;padding: 0 0 0 1px;color:white }
+			.tg    { border-collapse:collapse;border-spacing:0;border-color:#9ABAD9;width: 900px; }
+			.tg td { font-family:monospace;font-size:14px;padding:10px 20px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-top-width:1px;border-bottom-width:1px;border-color:#9ABAD9;color:#444;background-color:#EBF5FF; }
+			.tg th { font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 20px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-top-width:1px;border-bottom-width:1px;border-color:#9ABAD9;color:#fff;background-color:#409cff; }
+			.tg .tg-0lax { text-align:left;vertical-align:top }
+			.tg2    { border-collapse:collapse;border-spacing:0;border-color:#9ABAD9;width: auto; }
+			.tg2 td { font-family:monospace;font-size:14px;padding:10px 20px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-top-width:1px;border-bottom-width:1px;border-color:#9ABAD9;color:#444;background-color:#EBF5FF;vertical-align: top; }
+			.tg2 th { font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 20px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-top-width:1px;border-bottom-width:1px;border-color:#9ABAD9;color:#fff;background-color:#409cff; }
+			.bottom-table { margin-top: 1cm; border: none; border-spacing: 20px 0;}
+			a:link { color: white;}
+			a:visited { color: lightgreen;}
+			a:hover { color: hotpink;}
+			a:active { color: blue;}
+		</style>
+	</head>
+
+	<body>
+		<a href="https://www.jamf.com">
+			<img src="https://resources.jamf.com/images/logos/Jamf-Icon-color.png" height=50px style="margin-bottom: 1.0em"/>
+		</a>
+		<h1>Jamf Log Grabber Results</h1>' > $results
+}
+
+####################################################################################################
+#Array for Jamf Logs
+Jamf() {
+	printf '<h2>Client Logs</h2>' >> $results
+	mkdir -p $log_folder/Client_Logs
+	#GET SYSTEM PROFILE REPORT- This spits out a couple errors due to KEXT stuff that's deprecated
+	system_profiler -xml > $JSS/SystemReport.spx 2>/dev/null
+	#ADD JAMF CLIENT LOGS TO LOG FOLDER
+	if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS
+		grep  "Error" $JSS/jamf.log > $JSS/jamferror.log
+	else
+		printf '<p><code style="color: %s;">%s<br></p></code>' "red" "Jamf Client Logs not found" >> $results
 	fi
-	echo $HOME
-	#### End of HOME check
-	log_folder=$HOME/Desktop/"$loggedInUser"_"$current_date"_logs
-	results=$log_folder/Results.html
-	JSS=$log_folder/Client_Logs
-	security=$log_folder/Jamf_Security
-	connect=$log_folder/Connect
-	managed_preferences=$log_folder/Managed_Preferences
-	recon=$log_folder/Recon
-	self_service=$log_folder/Self_Service
-	Device_Compliance=$log_folder/Device_Compliance
-	JRA=$log_folder/JRA
-	App_Installers=$log_folder/App_Installers
-	jamfLog=$JSS/jamf.log
-	
-	reconleftovers=$(ls /Library/Application\ Support/JAMF/tmp/ 2> /dev/null)
-	runProtectDiagnostics="${10}"
-	#for testing
-	#runProtectDiagnostics="true"
-	protectDiagnostics=$(ls "$HOME/Desktop/" | grep "JamfProtectDiagnostics")
-	
-	
-	
-	#DATE AND TIME FOR RESULTS.TXT INFORMATION
-	#currenttime=$(date +"%D %T")
-	currenttime() {
-		date +"%D %T"
-	}
-	currenttime1=$(echo "$(currenttime)" | awk '{print $2}')
-	
-	####################################################################################################
-	#You can add custom app log grabbing using the following rubric, just continue numbering the appnames or renaming them to fit your needs
-	#You can pass jamf script variables as part of a policy to get your additional apps
-	
-	#CustomApp1Name=$4
-	CustomApp1Folder=$log_folder/$CustomApp1Name
-	#CustomApp1LogSource="$5"
-	#Now go down to CustomApp1Array and put in the files you want to grab
-	#CustomApp2Name="$6"
-	CustomApp2Folder=$log_folder/$CustomApp2Name
-	#CustomApp2LogSource="$7"
-	#Now go down to CustomApp2Array and put in the files you want to grab
-	#CustomApp3Name="$8"
-	CustomApp3Folder=$log_folder/$CustomApp3Name
-	#CustomApp3LogSource="$9"
-	#Now go down to CustomApp2Array and put in the files you want to grab
-	####################################################################################################
-	
-	#Build a results file in HTML
-	buildHTMLResults() {
-		printf '<html>
-		<head>  
-			<style type="text/css">
-				body { background-color:#444444;font-family:Helvetica,Arial,sans-serif;margin:20px; }
-				h1 { margin-top:1em;margin-bottom:0.2em;color:#9eb8d5 }
-				h2 { margin-top:1em;margin-bottom:0.2em;color:#37bb9a }
-				h3 { margin-top:0.8em;margin-bottom:0.2em;color:#37bb9a }
-				h4 { margin-top:0.8em;margin-bottom:0.2em;color:#37bb9a }
-				p { margin-top:0.2em;margin-bottom:0.2em;padding: 0 0 0 1px;color:white }
-				.tg    { border-collapse:collapse;border-spacing:0;border-color:#9ABAD9;width: 900px; }
-				.tg td { font-family:monospace;font-size:14px;padding:10px 20px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-top-width:1px;border-bottom-width:1px;border-color:#9ABAD9;color:#444;background-color:#EBF5FF; }
-				.tg th { font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 20px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-top-width:1px;border-bottom-width:1px;border-color:#9ABAD9;color:#fff;background-color:#409cff; }
-				.tg .tg-0lax { text-align:left;vertical-align:top }
-				.tg2    { border-collapse:collapse;border-spacing:0;border-color:#9ABAD9;width: auto; }
-				.tg2 td { font-family:monospace;font-size:14px;padding:10px 20px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-top-width:1px;border-bottom-width:1px;border-color:#9ABAD9;color:#444;background-color:#EBF5FF;vertical-align: top; }
-				.tg2 th { font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 20px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-top-width:1px;border-bottom-width:1px;border-color:#9ABAD9;color:#fff;background-color:#409cff; }
-				.bottom-table { margin-top: 1cm; border: none; border-spacing: 20px 0;}
-				a:link { color: white;}
-				a:visited { color: lightgreen;}
-				a:hover { color: hotpink;}
-				a:active { color: blue;}
-			</style>
-		</head>
-	
-		<body>
-			<a href="https://www.jamf.com">
-				<img src="https://resources.jamf.com/images/logos/Jamf-Icon-color.png" height=50px style="margin-bottom: 1.0em"/>
-			</a>
-			<h1>Jamf Log Grabber Results</h1>' > $results
-	}
-	
-	####################################################################################################
-	#Array for Jamf Logs
-	Jamf() {
-		printf '<h2>Client Logs</h2>' >> $results
-		mkdir -p $log_folder/Client_Logs
-		#GET SYSTEM PROFILE REPORT- This spits out a couple errors due to KEXT stuff that's deprecated
-		system_profiler -xml > $JSS/SystemReport.spx 2>/dev/null
-		#ADD JAMF CLIENT LOGS TO LOG FOLDER
-		if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS
-			grep  "Error" $JSS/jamf.log > $JSS/jamferror.log
-		else
-			printf '<p><code style="color: %s;">%s<br></p></code>' "red" "Jamf Client Logs not found" >> $results
-		fi
-		#CHECK FOR JAMF INSTALL LOGS
-		if [ -e /var/log/install.log ]; then cp "/var/log/install.log" $JSS 
-		else
-			printf '<code style="color: %s;">%s<br></code>' "red" "Install Logs not found" >> $results
-		fi
-		#CHECK FOR JAMF SYSTEM LOGS
-		if [ -e /var/log/system.log ]; then cp "/var/log/system.log" $JSS
-		else
-			printf '<code style="color: %s;">%s<br></code>' "red" "System Logs not found" >> $results
-		fi
-		#CHECK FOR JAMF SYSTEM LOGS
-		if [ -e /Library/Logs/MCXTools.log ]; then cp "/Library/Logs/MCXTools.log" $JSS
-		else
-			printf '<code style="color: %s;">%s<br></code>' "red" "System Logs not found" >> $results
-		fi
-		#FIND AND COPY JAMF SOFTWARE PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
-		#COPY DEBUG LOG
-		if [ -e /Library/Preferences/com.jamfsoftware.jamf.plist ]; then cp "/Library/Preferences/com.jamfsoftware.jamf.plist" "$JSS/com.jamfsoftware.jamf.plist" | plutil -convert xml1 "$JSS/com.jamfsoftware.jamf.plist" 
-		else
-			printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Software plist not found" >> $results
-		fi
-		mkdir -p $log_folder/Self_Service
-		#Checks what versions of self service are installed 
-		if [ -e /Applications/Self\ Service.app ]; then 
-			og="true"
-		else
-			og="false"
-		fi
-		echo "$og"
-		if [[ -e /Applications/Self\ Service+.app ]]; then
-			ssPlus="true"
-		else
-			ssPlus="false"
-		fi
-		echo "$ssPlus"
-		#fun little logic to update selfServiceStatus variable to pull logs according to reporting
-		if [ $og == "true" ] && [ $ssPlus == "true" ]; then
-			selfServiceStatus="ogPlus"
-			echo $selfServiceStatus
-		elif [ $og == "true" ] && [ $ssPlus == "false" ]; then
-			selfServiceStatus="ogSS"
-		elif [ $og == "false" ] && [ $ssPlus == "true" ]; then
-			selfServiceStatus="ssPlus"
-		else
-			selfServiceStatus="notInstalled"
-		fi
-		#everything put together to pull SS, SS+, or both apps logs
-		case $selfServiceStatus in
-			ogPlus)
-				printf '<code style="color: %s;">%s<br></code>' "white" "Self Service and Self Service+ are installed on this machine" >> $results
-				cp -r "$HOME/Library/Logs/JAMF/" $self_service
-				log show --style compact --predicate 'subsystem == "com.jamf.selfserviceplus"' --debug --info > $self_service/SelfServicePlus.log
-			;;
-			ssplus)
-				printf '<code style="color: %s;">%s<br></code>' "white" "Self Service+ is installed on this machine" >> $results
-				log show --style compact --predicate 'subsystem == "com.jamf.selfserviceplus"' --debug --info > $self_service/SelfServicePlus.log
-			;;
-			ogSS)
-				printf '<code style="color: %s;">%s<br></code>' "white" "Self Service is installed on this machine" >> $results
-				cp -r "$HOME/Library/Logs/JAMF/" $self_service
-			;;
-			*)
-				printf '<code style="color: %s;">%s<br></code>' "white" "Self Service and Self Service+ are not installed on this machine" >> $results
-				esac
-		#Checks current MacOS Version against GDMF feed and flags if not a current release
-		currentMacOS=$(sw_vers --buildVersion)
-		checkIfSupportedOS=$(curl -s https://gdmf.apple.com/v2/pmv | grep -c $currentMacOS)
-		if [[ $checkIfSupportedOS == 1 ]]; then
-			printf '<code style="color: %s;">%s<br></code>' "white" "MacOS build $currentMacOS installed" >> $results
-		else
-			printf '<code style="color: %s;">%s<br></code>' "red" "MacOS build $currentMacOS installed. Unable to locate in GDMF feed." >> $results
-		fi
-		#Check if account is a Mobile Account and report if so
-		NETACCLIST=$(dscl . list /Users OriginalNodeName | awk '{print $1}' 2>/dev/null)
-		if [ "$NETACCLIST" == "" ]; then
-			printf '<code style="color: %s;">%s<br></code>' "white" "No mobile accounts on device." >> $results
-		else
-			printf '<code style="color: %s;">%s<br></code>' "red" "The following are mobile accounts:" >> $results 
-			for account in $NETACCLIST; do
-				printf '<code style="color:red %s; white-space:pre;">&#9;'$account'<br></code>' >> $results 
+	#CHECK FOR JAMF INSTALL LOGS
+	if [ -e /var/log/install.log ]; then cp "/var/log/install.log" $JSS 
+	else
+		printf '<code style="color: %s;">%s<br></code>' "red" "Install Logs not found" >> $results
+	fi
+	#CHECK FOR JAMF SYSTEM LOGS
+	if [ -e /var/log/system.log ]; then cp "/var/log/system.log" $JSS
+	else
+		printf '<code style="color: %s;">%s<br></code>' "red" "System Logs not found" >> $results
+	fi
+	#CHECK FOR JAMF SYSTEM LOGS
+	if [ -e /Library/Logs/MCXTools.log ]; then cp "/Library/Logs/MCXTools.log" $JSS
+	else
+		printf '<code style="color: %s;">%s<br></code>' "red" "System Logs not found" >> $results
+	fi
+	#FIND AND COPY JAMF SOFTWARE PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
+	#COPY DEBUG LOG
+	if [ -e /Library/Preferences/com.jamfsoftware.jamf.plist ]; then cp "/Library/Preferences/com.jamfsoftware.jamf.plist" "$JSS/com.jamfsoftware.jamf.plist" | plutil -convert xml1 "$JSS/com.jamfsoftware.jamf.plist" 
+	else
+		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Software plist not found" >> $results
+	fi
+	mkdir -p $log_folder/Self_Service
+	#Checks what versions of self service are installed 
+	if [ -e /Applications/Self\ Service.app ]; then 
+		og="true"
+	else
+		og="false"
+	fi
+	echo "$og"
+	if [[ -e /Applications/Self\ Service+.app ]]; then
+		ssPlus="true"
+	else
+		ssPlus="false"
+	fi
+	echo "$ssPlus"
+	#fun little logic to update selfServiceStatus variable to pull logs according to reporting
+	if [ $og == "true" ] && [ $ssPlus == "true" ]; then
+		selfServiceStatus="ogPlus"
+		echo $selfServiceStatus
+	elif [ $og == "true" ] && [ $ssPlus == "false" ]; then
+		selfServiceStatus="ogSS"
+	elif [ $og == "false" ] && [ $ssPlus == "true" ]; then
+		selfServiceStatus="ssPlus"
+	else
+		selfServiceStatus="notInstalled"
+	fi
+	#everything put together to pull SS, SS+, or both apps logs
+	case $selfServiceStatus in
+		ogPlus)
+			printf '<code style="color: %s;">%s<br></code>' "white" "Self Service and Self Service+ are installed on this machine" >> $results
+			cp -r "$HOME/Library/Logs/JAMF/" $self_service
+			log show --style compact --predicate 'subsystem == "com.jamf.selfserviceplus"' --debug --info > $self_service/SelfServicePlus.log
+		;;
+		ssplus)
+			printf '<code style="color: %s;">%s<br></code>' "white" "Self Service+ is installed on this machine" >> $results
+			log show --style compact --predicate 'subsystem == "com.jamf.selfserviceplus"' --debug --info > $self_service/SelfServicePlus.log
+		;;
+		ogSS)
+			printf '<code style="color: %s;">%s<br></code>' "white" "Self Service is installed on this machine" >> $results
+			cp -r "$HOME/Library/Logs/JAMF/" $self_service
+		;;
+		*)
+			printf '<code style="color: %s;">%s<br></code>' "white" "Self Service and Self Service+ are not installed on this machine" >> $results
+			esac
+	#Checks current MacOS Version against GDMF feed and flags if not a current release
+	currentMacOS=$(sw_vers --buildVersion)
+	checkIfSupportedOS=$(curl -s https://gdmf.apple.com/v2/pmv | grep -c $currentMacOS)
+	if [[ $checkIfSupportedOS == 1 ]]; then
+		printf '<code style="color: %s;">%s<br></code>' "white" "MacOS build $currentMacOS installed" >> $results
+	else
+		printf '<code style="color: %s;">%s<br></code>' "red" "MacOS build $currentMacOS installed. Unable to locate in GDMF feed." >> $results
+	fi
+	#Check if account is a Mobile Account and report if so
+	NETACCLIST=$(dscl . list /Users OriginalNodeName | awk '{print $1}' 2>/dev/null)
+	if [ "$NETACCLIST" == "" ]; then
+		printf '<code style="color: %s;">%s<br></code>' "white" "No mobile accounts on device." >> $results
+	else
+		printf '<code style="color: %s;">%s<br></code>' "red" "The following are mobile accounts:" >> $results 
+		for account in $NETACCLIST; do
+			printf '<code style="color:red %s; white-space:pre;">&#9;'$account'<br></code>' >> $results 
+		done
+	fi
+	#############################################
+	#            Software Update Stuff          #
+	#############################################
+	#Show Secure Token enabled users
+	checkForSecureTokenUsers=$(fdesetup list | sed -E 's/,[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}//g')
+			if [[ $checkForSecureTokenUsers == "" ]]; then
+				printf '<code style="color: %s;">%s<br></code>' "red" "No Secure Token Users Found" >> $results
+			else
+				printf '<code style="color: %s;">%s<br></code>' "white" "Secure Token Users are: $checkForSecureTokenUsers" >> $results
+			fi
+	#Get info.plist that would be relayed to server for comparison
+	mkdir -p $JSS/SoftwareUpdates
+			if [[ -e /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/SoftwareUpdateSubscriber.xpc/Contents/Info.plist ]]; then 
+				cp /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/SoftwareUpdateSubscriber.xpc/Contents/Info.plist $JSS/SoftwareUpdates/ClientInfo.plist
+			else 
+				printf '<code style="color: %s;">%s<br></code>' "red" "Unable to find SoftwareUpdate info.plist" >> $results
+			fi
+				if [[ -e /private/var/db/softwareupdate/SoftwareUpdateDDMStatePersistence.plist ]]; then 
+				cp /private/var/db/softwareupdate/SoftwareUpdateDDMStatePersistence.plist $JSS/SoftwareUpdates/DDM.plist
+			else 
+				printf '<code style="color: %s;">%s<br></code>' "red" "Unable to find Software Update DDM plist" >> $results
+			fi
+	#############################################
+	#        	    DDM Info   			        #
+	#############################################
+	#Copy the current declaration info.plists for reference
+	DDMInfoPlists=$(ls /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/ | grep -Ewv 'SoftwareUpdateSubscriber.xpc')
+		mkdir -p $JSS/DDM
+			for file in $DDMInfoPlists; do
+				if [[ -e /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/$file/Contents/info.plist ]]; then
+					cp /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/$file/Contents/info.plist $JSS/DDM/"$file"_info.plist
+				fi
 			done
-		fi
-		#############################################
-		#            Software Update Stuff          #
-		#############################################
-		#Show Secure Token enabled users
-		checkForSecureTokenUsers=$(fdesetup list | sed -E 's/,[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}//g')
-				if [[ $checkForSecureTokenUsers == "" ]]; then
-					printf '<code style="color: %s;">%s<br></code>' "red" "No Secure Token Users Found" >> $results
-				else
-					printf '<code style="color: %s;">%s<br></code>' "white" "Secure Token Users are: $checkForSecureTokenUsers" >> $results
-				fi
-		#Get info.plist that would be relayed to server for comparison
-		mkdir -p $JSS/SoftwareUpdates
-				if [[ -e /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/SoftwareUpdateSubscriber.xpc/Contents/Info.plist ]]; then 
-					cp /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/SoftwareUpdateSubscriber.xpc/Contents/Info.plist $JSS/SoftwareUpdates/ClientInfo.plist
-				else 
-					printf '<code style="color: %s;">%s<br></code>' "red" "Unable to find SoftwareUpdate info.plist" >> $results
-				fi
-					if [[ -e /private/var/db/softwareupdate/SoftwareUpdateDDMStatePersistence.plist ]]; then 
-					cp /private/var/db/softwareupdate/SoftwareUpdateDDMStatePersistence.plist $JSS/SoftwareUpdates/DDM.plist
-				else 
-					printf '<code style="color: %s;">%s<br></code>' "red" "Unable to find Software Update DDM plist" >> $results
-				fi
-		#############################################
-		#        	    DDM Info   			        #
-		#############################################
-		#Copy the current declaration info.plists for reference
-		DDMInfoPlists=$(ls /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/ | grep -Ewv 'SoftwareUpdateSubscriber.xpc')
-			mkdir -p $JSS/DDM
-				for file in $DDMInfoPlists; do
-					if [[ -e /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/$file/Contents/info.plist ]]; then
-						cp /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/$file/Contents/info.plist $JSS/DDM/"$file"_info.plist
-					fi
-				done
-		#Parse through all agents and deamons for any running keyword "jamf" and are not a part of standard Jamf applications. If none are found, they are still printed 
-		AgentsAndDaemons=$(grep -r "jamf" /Users/$loggedInUser/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/)
-				printf '<code style="color: %s;">%s<br></code>' "white" "A search for custom Agents and Daemons containing 'jamf' keywords has been ran and a copy of the results can be found in the Client Logs folder." >> $results
-				echo -e "$AgentsAndDaemons" > $JSS/AgentsAndDaemons.txt
-		#read blocked applications in jamf
-		sudo cat /Library/Application\ Support/JAMF/.jmf_settings.json > $JSS/restricted_software.json
-		#show installed profiles and output to xml. Use this to compare profile settings against actual settings in Managed Preferences Folder
-		sudo profiles show -output $JSS/profiles.xml stdout-xml	
-		/usr/libexec/mdmclient AvailableOSUpdates > $JSS/SoftwareUpdates/AvailableOSUpdates.txt
-		/usr/libexec/mdmclient QueryDeviceInformation > $JSS/QueryDeviceInformation.txt
-		/usr/libexec/mdmclient DumpManagementStatus > $JSS/DumpManagementStatus.txt
-		launchctl dumpstate > $JSS/launchctl_dumpstate.txt
-		systemextensionsctl list > $JSS/system_extensions.txt
-		kextstat > $JSS/kextstat.txt
-		cp /Library/Receipts/InstallHistory.plist $JSS
-		if [ -e /Library/Logs/DiagnosticReports/ ]; then mkdir -p $JSS/DiagnosticReports && cp -r /Library/Logs/DiagnosticReports/ "$JSS/DiagnosticReports"
-			#SLEEP TO ALLOW COPY TO FINISH PROCESSING ALL FILES
-			sleep 5
+	#Parse through all agents and deamons for any running keyword "jamf" and are not a part of standard Jamf applications. If none are found, they are still printed 
+	AgentsAndDaemons=$(grep -r "jamf" /Users/$loggedInUser/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/)
+			printf '<code style="color: %s;">%s<br></code>' "white" "A search for custom Agents and Daemons containing 'jamf' keywords has been ran and a copy of the results can be found in the Client Logs folder." >> $results
+			echo -e "$AgentsAndDaemons" > $JSS/AgentsAndDaemons.txt
+	#read blocked applications in jamf
+	sudo cat /Library/Application\ Support/JAMF/.jmf_settings.json > $JSS/restricted_software.json
+	#show installed profiles and output to xml. Use this to compare profile settings against actual settings in Managed Preferences Folder
+	sudo profiles show -output $JSS/profiles.xml stdout-xml	
+	/usr/libexec/mdmclient AvailableOSUpdates > $JSS/SoftwareUpdates/AvailableOSUpdates.txt
+	/usr/libexec/mdmclient QueryDeviceInformation > $JSS/QueryDeviceInformation.txt
+	/usr/libexec/mdmclient DumpManagementStatus > $JSS/DumpManagementStatus.txt
+	launchctl dumpstate > $JSS/launchctl_dumpstate.txt
+	systemextensionsctl list > $JSS/system_extensions.txt
+	kextstat > $JSS/kextstat.txt
+	cp /Library/Receipts/InstallHistory.plist $JSS
+	if [ -e /Library/Logs/DiagnosticReports/ ]; then mkdir -p $JSS/DiagnosticReports && cp -r /Library/Logs/DiagnosticReports/ "$JSS/DiagnosticReports"
+		#SLEEP TO ALLOW COPY TO FINISH PROCESSING ALL FILES
+		sleep 5
+	else
+		printf '<code style="color: %s;">%s<br></code>' "red" "No crash reports found." >> $results
+	fi
+}
+
+
+####################################################################################################
+#Array for Jamf Connect Logs
+Connect() {
+	printf '<h2>Jamf Connect</h2>' >> $results
+	printf '<code style="color: %s;">%s<br></code>' "white" "Checking for Jamf Connect" >> $results
+	if [ -e /Library/Managed\ Preferences/com.jamf.connect.plist ]; then
+		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Connect installed, collecting Jamf Connect logs..." >>$results
+		connectInstalled="True"
+		mkdir -p $log_folder/Connect
+		#OUTPUT ALL HISTORICAL JAMF CONNECT LOGS, THIS WILL ALWAYS GENERATE A LOG FILE EVEN IF CONNECT IS NOT INSTALLED
+		log show --style compact --predicate 'subsystem == "com.jamf.connect"' --debug > $connect/JamfConnect.log
+		#OUTPUT ALL HISTORICAL JAMF CONNECT LOGIN LOGS
+		log show --style compact --predicate 'subsystem == "com.jamf.connect.login"' --debug > $connect/jamfconnect.login.log
+		kerblist=$("klist" 2>/dev/null)
+		if [[ "$kerblist" == "" ]];then
+			printf '<code style="color: %s;">%s<br></code>' "white" "-No Kerberos Ticket for Current Logged in User $loggedInUser" > $connect/klist_manuallyCollected.txt; else
+				echo $kerblist > $connect/klist_manuallyCollected.txt; 
+			fi
+		#CHECK FOR JAMF CONNECT LOGIN LOGS AND PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
+		if [ -e /tmp/jamf_login.log ]; then cp "/tmp/jamf_login.log" $connect/jamf_login_tmp.log
 		else
-			printf '<code style="color: %s;">%s<br></code>' "red" "No crash reports found." >> $results
+			printf '<code style="color: %s;">%s<br></code>' "orange" "-Jamf Login /tmp file not found<br>-This usually only exists on recent installs.<br>-Don't worry if you don't see anything. We're just being thorough." >> $results
 		fi
-	}
-	
-	
-	####################################################################################################
-	#Array for Jamf Connect Logs
-	Connect() {
-		printf '<h2>Jamf Connect</h2>' >> $results
-		printf '<code style="color: %s;">%s<br></code>' "white" "Checking for Jamf Connect" >> $results
-		if [ -e /Library/Managed\ Preferences/com.jamf.connect.plist ]; then
-			printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Connect installed, collecting Jamf Connect logs..." >>$results
-			connectInstalled="True"
-			mkdir -p $log_folder/Connect
-			#OUTPUT ALL HISTORICAL JAMF CONNECT LOGS, THIS WILL ALWAYS GENERATE A LOG FILE EVEN IF CONNECT IS NOT INSTALLED
-			log show --style compact --predicate 'subsystem == "com.jamf.connect"' --debug > $connect/JamfConnect.log
-			#OUTPUT ALL HISTORICAL JAMF CONNECT LOGIN LOGS
-			log show --style compact --predicate 'subsystem == "com.jamf.connect.login"' --debug > $connect/jamfconnect.login.log
-			kerblist=$("klist" 2>/dev/null)
-			if [[ "$kerblist" == "" ]];then
-				printf '<code style="color: %s;">%s<br></code>' "white" "-No Kerberos Ticket for Current Logged in User $loggedInUser" > $connect/klist_manuallyCollected.txt; else
-					echo $kerblist > $connect/klist_manuallyCollected.txt; 
-				fi
-			#CHECK FOR JAMF CONNECT LOGIN LOGS AND PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
-			if [ -e /tmp/jamf_login.log ]; then cp "/tmp/jamf_login.log" $connect/jamf_login_tmp.log
-			else
-				printf '<code style="color: %s;">%s<br></code>' "orange" "-Jamf Login /tmp file not found<br>-This usually only exists on recent installs.<br>-Don't worry if you don't see anything. We're just being thorough." >> $results
-			fi
-			
-			if [ -e /Library/Managed\ Preferences/com.jamf.connect.login.plist ]; then cp "/Library/Managed Preferences/com.jamf.connect.login.plist" "$connect/com.jamf.connect.login_managed.plist" | plutil -convert xml1 "$connect/com.jamf.connect.login_managed.plist" | log show --style compact --predicate 'subsystem == "com.jamf.connect.login"' --debug > "$connect/com.jamf.connect.login.log"
-			else
-				printf '<code style="color: %s;">%s<br></code>' "red" "-Jamf Connect Login plist not found" >> $results
-			fi
-			
-			#CHECK FOR JAMF CONNECT LICENSE, THEN COPY AND CONVERT TO A READABLE FORMAT
-			printf '<h3>License Check</h3>' >> $results
-			LicensefromLogin=$(defaults read /Library/Managed\ Preferences/com.jamf.connect.login.plist LicenseFile 2>/dev/null)
-			LicensefromMenubar=$(defaults read /Library/Managed\ Preferences/com.jamf.connect.plist LicenseFile 2>/dev/null)
-			if [[ "$LicensefromLogin" != "" ]]; then
-				(echo "$LicensefromLogin" | base64 -d) > $connect/license.txt
-			elif [[ "$LicensefromMenubar" != "" ]]; then
-				(echo "$LicensefromMenubar" | base64 -d) > $connect/license.txt
-			else
-				file=""
-			fi
-			
-			#CHECK FOR JAMF CONNECT STATE PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
-			State_plist=$(defaults read /Users/$loggedInUser/Library/Preferences/com.jamf.connect.state.plist 2>/dev/null)
-			if [[ "$State_plist" == "" ]]; then
-				printf '<code style="color: %s;">%s<br></code>' "red" "-A Jamf Connect State list was not found because no user is logged into Menu Bar" >> $results; 
-			else cp $HOME/Library/Preferences/com.jamf.connect.state.plist "$connect/com.jamf.connect.state.plist" | plutil -convert xml1 $connect/com.jamf.connect.state.plist
-			fi
-			
-			#CHECK FOR JAMF CONNECT MENU BAR PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
-			if [ -e /Library/Managed\ Preferences/com.jamf.connect.plist ]; then cp "/Library/Managed Preferences/com.jamf.connect.plist" "$connect/com.jamf.connect_managed.plist" | plutil -convert xml1 "$connect/com.jamf.connect_managed.plist" | log show --style compact --predicate 'subsystem == "com.jamf.connect"' --debug > "$connect/com.jamf.connect.log"
-			else
-				printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Connect plist not found" >> $results
-			fi
-			
-			#LIST AUTHCHANGER SETTIGNS
-			if [ -e /usr/local/bin/authchanger ]; then
-				/usr/local/bin/authchanger -print > "$connect/authchanger_manuallyCollected.txt"
-				:
-			else
-				printf '<code style="color: %s;">%s<br></code>' "white" "-No Authchanger settings found" >> $results
-			fi
+		
+		if [ -e /Library/Managed\ Preferences/com.jamf.connect.login.plist ]; then cp "/Library/Managed Preferences/com.jamf.connect.login.plist" "$connect/com.jamf.connect.login_managed.plist" | plutil -convert xml1 "$connect/com.jamf.connect.login_managed.plist" | log show --style compact --predicate 'subsystem == "com.jamf.connect.login"' --debug > "$connect/com.jamf.connect.login.log"
 		else
-			printf '<code style="color: %s;">%s<br></code>' "white" "-No Jamf Connect Installed, doing nothing" >> $results
-			connectInstalled="False"
+			printf '<code style="color: %s;">%s<br></code>' "red" "-Jamf Connect Login plist not found" >> $results
 		fi
-		#CHECK THE JAMF CONNECT LICENSE FILE AND LOOK FOR OTHER PROFILES THAT MAY HAVE A JAMF CONNECT LICENSE
-		connectLicenseInstalled=$(defaults read $managed_preferences/com.jamf.connect.plist LicenseFile)
-		connectLoginLicenseInstalled=$(defaults read $managed_preferences/com.jamf.connect.login.plist LicenseFile)
-		profilesWithConnectLicense=$(grep -A 1 "LicenseFile" $JSS/profiles.xml | awk -F'<string>' '{print $2}' | sed 's/string>//g' | sed 's/<.*//;/^$/d')
-		connectLicenseExpiration=$(grep -A 1 "ExpirationDate" $connect/license.txt | awk '{ print $1 }' | sed 's/<string>//g' | sed 's/<.*//;/^$/d' | tr -d "-")
-		connectDateCompare=$(date +%Y%m%d)
 		
-		#REPORT JAMF CONNECT PRIVILEGE ELEVATION LOGS
-		log show --style compact --predicate '(subsystem == "com.jamf.connect.daemon") && (category == "PrivilegeElevation")' >> $connect/Connect_Daemon_Elevation_Logs.txt
-		log show --style compact --predicate '(subsystem == "com.jamf.connect") && (category == "PrivilegeElevation")' >> $connect/Connect_Menubar_Elevation_Logs.txt
-		
-		connectLicenseArray() {
-			if [[ "$connectLicenseInstalled" == "" ]]; then
-				printf '<code style="color: %s;">%s<br></code>' "red" "No License found for com.jamf.connect" >> $results
-			else
-				for i in $profilesWithConnectLicense; do
-					if [[ "$i" == $connectLicenseInstalled ]]; then
-						printf '<code style="color: %s;">%s<br></code>' "lime" "--Matching Profile found for installed Connect License (com.jamf.connect)." >> $results
-						if [[ $connectDateCompare -ge $connectLicenseExpiration ]]; then
-							printf '<code style="color: %s;">%s<br></code>' "red" "--Currently installed Jamf Connect License is expired." >> $results
-						else
-							printf '<code style="color: %s;">%s<br></code>' "lime" "--Currently installed Jamf Connect License is valid." >> $results
-						fi
-					else
-						printf '<code style="color: %s;">%s<br></code>' "red" "--Mismatch between installed Connect license found in com.jamf.connect.login plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:<br>"
-						printf '<code style="color: %s;">%s<br></code>' "white" "$i " >> $results
-					fi
-				done
-			fi
-		}
-		
-		connectLoginLicenseArray() {
-			if [[ "$connectLoginLicenseInstalled" == "" ]]; then
-				printf '<code style="color: %s;">%s<br></code>' "red" "No License found for com.jamf.connect.login" >> $results
-			else
-				for i in $profilesWithConnectLicense; do
-					if [[ "$i" == $connectLoginLicenseInstalled ]]; then
-						printf '<code style="color: %s;">%s<br></code>' "lime" "--Matching Profile found for installed Connect License (com.jamf.connect.login)." >> $results
-						if [ $connectDateCompare -ge $connectLicenseExpiration ]; then
-							printf '<code style="color: %s;">%s<br></code>' "red" "--Currently installed Jamf Connect License is expired." >> $results
-						else
-							printf '<code style="color: %s;">%s<br></code>' "lime" "--Currently installed Jamf Connect License is valid." >> $results
-						fi
-					else
-						printf '<code style="color: %s;">%s<br></code>' "red" "--Mismatch between installed Connect license found in com.jamf.connect.login plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:<br>"
-						printf '<code style="color: %s;">%s<br></code>' "white" "$i" >> $results
-					fi
-				done	
-			fi
-		}
-		
-		connectLicenseFormatCheck() {
-			PI110629Check=$(awk '/string>PD94/ {count++} END {print count}' "$JSS/profiles.xml")
-			if [[ $PI110629Check -ge "1" ]]; then
-				printf '<code style="color: %s;">%s<br></code>' "red" "Key value assigned to LicenseFile uses string tag and appears to be affected by PI110629" >> $results
-			elif [[ $PI110629Check -le "0" ]]; then
-				printf '<code style="color: %s;">%s<br></code>' "lime" "Key value assigned to LicenseFile uses data tag and does not appear to be affected by PI110629" >> $results
-			fi
-		}
-		if [[ $connectInstalled = "True" ]]; then
-		connectLicenseArray 
-		connectLoginLicenseArray 
-		connectLicenseFormatCheck
-		fi
-	}
-	
-	
-	####################################################################################################
-	#Array for Jamf Protect Logs
-	Protect() {
-		#MAKE DIRECTORY FOR ALL JAMF SECURITY RELATED FILES
-		mkdir -p $log_folder/Jamf_Security
-		printf '<h2>Jamf Protect</h2>' >> $results
-		shopt -s nocasematch
-		
-		case $runProtectDiagnostics in
-			true)
-				if [[ $protectDiagnostics == "" ]]; then 
-					echo "Protect Diagnostics enabled but no existing file found, creating file, please wait up to 5 minutes"
-					protectctl diagnostics -o $HOME/Desktop/ -d 5
-					#need to re-eval protect diagnostics so it sees the file
-					protectDiagnostics=$(ls "$HOME/Desktop/" | grep "JamfProtectDiagnostics")
-					cp "$HOME/Desktop/$protectDiagnostics" "$security"
-					printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files created. Please check Jamf_Security Folder for files." >> $results
-				else
-					echo "Protect Diagnostics found, copying to Jamf Log Grabber"
-					cp "$HOME/Desktop/$protectDiagnostics" "$security"
-					printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been previously ran and the diagnostics folder was found on the desktop of this device." >> $results
-				fi
-			;;
-			*)
-				if [[ $protectDiagnostics != "" ]]; then 
-					echo "Protect Diagnostics found, copying to Jamf Log Grabber"
-					cp "$HOME/Desktop/$protectDiagnostics" "$security"
-					printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been previously ran and the diagnostics folder was found on the desktop of this device." >> $results
-				else
-					echo "Protect Diagnostics disabled and no copy found on desktop"
-				fi
-			;;
-		esac
-		#CHECK FOR JAMF PROTECT PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
-		if [ -e /Library/Managed\ Preferences/com.jamf.protect.plist ]; then cp "/Library/Managed Preferences/com.jamf.protect.plist" "$security/com.jamf.protect.plist"
-			printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Protect plist found" >> $results
-			plutil -convert xml1 "$security/com.jamf.protect.plist"
-			protectctl info --verbose > $security/jamfprotectinfo.log
-			
+		#CHECK FOR JAMF CONNECT LICENSE, THEN COPY AND CONVERT TO A READABLE FORMAT
+		printf '<h3>License Check</h3>' >> $results
+		LicensefromLogin=$(defaults read /Library/Managed\ Preferences/com.jamf.connect.login.plist LicenseFile 2>/dev/null)
+		LicensefromMenubar=$(defaults read /Library/Managed\ Preferences/com.jamf.connect.plist LicenseFile 2>/dev/null)
+		if [[ "$LicensefromLogin" != "" ]]; then
+			(echo "$LicensefromLogin" | base64 -d) > $connect/license.txt
+		elif [[ "$LicensefromMenubar" != "" ]]; then
+			(echo "$LicensefromMenubar" | base64 -d) > $connect/license.txt
 		else
-			printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Protect plist not found" >> $results
+			file=""
 		fi
-		#CHECK FOR JAMF TRUST PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
-		if [ -e /Library/Managed\ Preferences/com.jamf.trust.plist ]; then cp "/Library/Managed Preferences/com.jamf.trust.plist" "$security/com.jamf.trust.plist" 
-			plutil -convert xml1 "$security/com.jamf.trust.plist"
+		
+		#CHECK FOR JAMF CONNECT STATE PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
+		State_plist=$(defaults read /Users/$loggedInUser/Library/Preferences/com.jamf.connect.state.plist 2>/dev/null)
+		if [[ "$State_plist" == "" ]]; then
+			printf '<code style="color: %s;">%s<br></code>' "red" "-A Jamf Connect State list was not found because no user is logged into Menu Bar" >> $results; 
+		else cp $HOME/Library/Preferences/com.jamf.connect.state.plist "$connect/com.jamf.connect.state.plist" | plutil -convert xml1 $connect/com.jamf.connect.state.plist
+		fi
+		
+		#CHECK FOR JAMF CONNECT MENU BAR PLIST, THEN COPY AND CONVERT TO A READABLE FORMAT
+		if [ -e /Library/Managed\ Preferences/com.jamf.connect.plist ]; then cp "/Library/Managed Preferences/com.jamf.connect.plist" "$connect/com.jamf.connect_managed.plist" | plutil -convert xml1 "$connect/com.jamf.connect_managed.plist" | log show --style compact --predicate 'subsystem == "com.jamf.connect"' --debug > "$connect/com.jamf.connect.log"
 		else
-			printf '<h2>Jamf Trust</h2>' >> $results
-			printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Trust plist not found" >> $results
+			printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Connect plist not found" >> $results
 		fi
-	}
-	
-	####################################################################################################
-	#Array for Recon Troubleshoot
-	Recon_Troubleshoot() {
-		mkdir -p $log_folder/Recon
-		#check for Jamf Recon leftovers
-		if [[ $reconleftovers == "" ]]; then
+		
+		#LIST AUTHCHANGER SETTIGNS
+		if [ -e /usr/local/bin/authchanger ]; then
+			/usr/local/bin/authchanger -print > "$connect/authchanger_manuallyCollected.txt"
 			:
 		else
-			printf '<h2>Recon Troubleshoot</h2>' >> $results
-			echo $reconleftovers > $recon/Leftovers.txt
-			#DIAGNOSTIC INFORMATION FOR RECON RESULTS. FOLLOWING THESE STEPS WILL HELP IDENTIFY PROBLEMATIC EXTENSION ATTRIBUTES AND/OR INVENTORY CHECK IN PROBLEMS
-			echo -e "\nRecon leftovers found and listed above\nTo remediate, take the following steps:\n1. Open the other files in this folder\n2.Find the Extension Attribute that matches the script in this file\n3.Remove or remediate the associate Extension Attribute Script\n4.Confirm by running a 'Sudo Jamf Recon' and verifying the files do not return.\n" >> $recon/Leftovers.txt
-			#REPORT IN RESULTS FILE THAT LEFTOVERS WERE FOUND
-			printf '<code style="color: %s;">%s<br></code>' "white" "Recon Troubleshoot found files in the /tmp directory that should not be there. A report of these files as well as next actions can be found in the Leftovers.txt file in the Recon Directory." >> $results
-			#copy all files in tmp folder to recon results folder
-			cp -r /Library/Application\ Support/Jamf/tmp/ $recon/
-			timefound=`grep -E -i '[0-9]+:[0-9]+' ${jamfLog} | awk '{print $4}' | tail -1`
-			echo $timefound > /dev/null
-			timeFoundNoSeconds=$(echo "${timefound:0:5}${timefound:8:3}")
-			currentTimeNoSeconds=$(echo "${currenttime1:0:5}${currenttime1:8:3}")
-			echo $timeFoundNoSeconds > /dev/null
-			echo $currentTimeNoSeconds > /dev/null
-			if [[ "$timeFoundNoSeconds" == "$currentTimeNoSeconds" ]]; then
-				printf '<code style="color: %s;">%s<br></code>' "Orange" "JLG appears to be running via policy, results in Recon directory may be inaccurate as files are stored there while policies are running." >> $results
-			else
-				printf '<code style="color: %s;">%s<br></code>' "Orange" "JLG appears to have been manually run. Results in Recon directory should be examined closely." >> $results
-			fi
+			printf '<code style="color: %s;">%s<br></code>' "white" "-No Authchanger settings found" >> $results
 		fi
-	}
-	####################################################################################################
-	#Array for MDM Communication Check
-	#IF A DEVICE IS NOT COMMUNICATING WITH MDM, THIS WILL GIVE ITEMS TO LOOK INTO
-	MDMCommunicationCheck() {
-		touch $log_folder/MDMCheck.txt
-		#WRITE TO LOGS WHAT WE ARE DOING NEXT
-		echo -e "Checking $loggedInUser's computer for MDM communication issues:" >> $log_folder/MDMCheck.txt
-		#CHECK MDM STATUS AND ADVISE IF IT IS COMMUNICATING
-		result=$(log show --style compact --predicate '(process CONTAINS "mdmclient")' --last 1d | grep "Unable to create MDM identity")
-		if [[ $result == '' ]]; then
-			echo -e "-MDM is communicating" >> $log_folder/MDMCheck.txt
-		else
-			echo -e "-MDM is broken" >> $log_folder/MDMCheck.txt
-		fi
-		#CHECK FOR THE MDM PROFILE TO BE INSTALLED
-		mdmProfile=$(/usr/libexec/mdmclient QueryInstalledProfiles | grep "00000000-0000-0000-A000-4A414D460003")
-		if [[ $mdmProfile == "" ]]; then
-			echo -e "-MDM Profile Not Installed" >> $log_folder/MDMCheck.txt
-		else
-			echo -e "-MDM Profile Installed" >> $log_folder/MDMCheck.txt
-		fi
-		#TELL THE STATUS OF THE MDM DAEMON
-		mdmDaemonStatus=$(/System/Library/PrivateFrameworks/ApplePushService.framework/apsctl status | grep -A 18 com.apple.aps.mdmclient.daemon.push.production | awk -F':' '/persistent connection status/ {print $NF}' | sed 's/^ *//g')
-		echo -e "-The MDM Daemon Status is:$mdmDaemonStatus" >> $log_folder/MDMCheck.txt
-		#WRITE THE APNS TOPIC TO THE RESULTS FILE IF IT EXISTS
-		profileTopic=$(system_profiler SPConfigurationProfileDataType | grep "Topic" | awk -F '"' '{ print $2 }');
-		if [ "$profileTopic" != "" ]; then
-			echo -e "-APNS Topic is: $profileTopic\n" >> $log_folder/MDMCheck.txt
-		else
-			echo -e "-No APNS Topic Found\n" >> $log_folder/MDMCheck.txt
-		fi
-	}
-	####################################################################################################
-	#Array for Managed Preferences Collection
-	Managed_Preferences_Array() {
-		#mkdir -p $log_folder/Managed\ Preferences
-		#CHECK FOR MANAGED PREFERENCE PLISTS, THEN COPY AND CONVERT THEM TO A READABLE FORMAT
-		if [ -e /Library/Managed\ Preferences/ ]; then cp -r /Library/Managed\ Preferences $managed_preferences
-			#SLEEP TO ALLOW COPY TO FINISH PROCESSING ALL FILES
-			sleep 5
-			#UNABLE TO CHECK FOLDER FOR WILDCARD PLIST LIKE *.PLIST
-			plutil -convert xml1 $managed_preferences/*.plist
-			plutil -convert xml1 $managed_preferences/$loggedInUser/*.plist
-			printf '<h2>Managed Preferences</h2>' >> $results
-			checkManagedNotifications=$(plutil -extract NotificationSettings xml1 -o - /Library/Managed\ Preferences/com.apple.notificationsettings.plist | grep "<key>BundleIdentifier</key>" -A 1 | grep "<string>" | sed -E 's|<string>(.*)</string>|\1|')
-			printf '<code style="color: %s;">%s<br></code>' "white" "Managed notifications found for the following applications:" >> $results
-			for app in $checkManagedNotifications; do
-				printf '<code style="color: %s;">\t%s\n<br></code>' "white" "- $app" >> $results
-			done
-		else
-			printf '<h2>Managed Preferences</h2>' >> $results
-			printf '<code style="color: %s;">%s<br></code>' "red" "No Managed Preferences plist files found" >> $results
-		fi
-	}
+	else
+		printf '<code style="color: %s;">%s<br></code>' "white" "-No Jamf Connect Installed, doing nothing" >> $results
+		connectInstalled="False"
+	fi
+	#CHECK THE JAMF CONNECT LICENSE FILE AND LOOK FOR OTHER PROFILES THAT MAY HAVE A JAMF CONNECT LICENSE
+	connectLicenseInstalled=$(defaults read $managed_preferences/com.jamf.connect.plist LicenseFile)
+	connectLoginLicenseInstalled=$(defaults read $managed_preferences/com.jamf.connect.login.plist LicenseFile)
+	profilesWithConnectLicense=$(grep -A 1 "LicenseFile" $JSS/profiles.xml | awk -F'<string>' '{print $2}' | sed 's/string>//g' | sed 's/<.*//;/^$/d')
+	connectLicenseExpiration=$(grep -A 1 "ExpirationDate" $connect/license.txt | awk '{ print $1 }' | sed 's/<string>//g' | sed 's/<.*//;/^$/d' | tr -d "-")
+	connectDateCompare=$(date +%Y%m%d)
 	
-	####################################################################################################
-	#Array for Device Compliance
-	DeviceCompliance() {
-		mkdir -p $log_folder/Device_Compliance
-		log show --predicate 'subsystem CONTAINS "jamfAAD" OR subsystem BEGINSWITH "com.apple.AppSSO"' > $Device_Compliance/JamfConditionalAccess.log
-		if [ -e /Library/Logs/Microsoft/Intune/ ]; then cp /Library/Logs/Microsoft/Intune/*.log $Device_Compliance
-		else
-			printf '<h2>Device Compliance</h2>' >> $results
-			printf '<code style="color: %s;">%s<br></code>' "orange" "Device Compliance system logs not found" >> $results
-		fi
-		if [ -e /$loggedInUser/Logs/Microsoft/Intune/ ]; then cp /Library/Logs/Microsoft/Intune/*.log $Device_Compliance
-		else
-			printf '<code style="color: %s;">%s<br></code>' "orange" "Device Compliance user logs not found" >> $results
-		fi
-		
-	}
+	#REPORT JAMF CONNECT PRIVILEGE ELEVATION LOGS
+	log show --style compact --predicate '(subsystem == "com.jamf.connect.daemon") && (category == "PrivilegeElevation")' >> $connect/Connect_Daemon_Elevation_Logs.txt
+	log show --style compact --predicate '(subsystem == "com.jamf.connect") && (category == "PrivilegeElevation")' >> $connect/Connect_Menubar_Elevation_Logs.txt
 	
-	####################################################################################################
-	#Array for Device Compliance
-	Remote_Assist() {
-		JRA3Check=$(defaults read /Library/Application\ Support/JAMF/Remote\ Assist/jamfRemoteAssistConnectorUI.app/Contents/Info.plist CFBundleVersion 2>/dev/null)
-		printf '<h2>Jamf Remote Assist</h2>' >> $results
-		if [[ $JRA3Check = "" ]]; then
-			printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist not installed, skipping version and network check." >> $results
+	connectLicenseArray() {
+		if [[ "$connectLicenseInstalled" == "" ]]; then
+			printf '<code style="color: %s;">%s<br></code>' "red" "No License found for com.jamf.connect" >> $results
 		else
-			#ADD JAMF Remote Assist Log Folder
-			printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist Version: $JRA3Check" >> $results
-			function createNetworkCheckTableJRA () {
-	
-				/bin/cat << EOF >> "$results"  
-			<p />
-			<p>Network access to the following hostnames are required for using Jamf Remote Assist. These hostnames are a small sample as the Relay hostnames can increment up to 100 currently.</p>
-	${HOST_TEST_TABLES}
-	EOF
-			}
-			
-			
-		function CalculateHostInfoTablesJRA () {
-				echo "[step] Checking URLS"
-				lastCategory="zzzNone"  # Some fake category so we recognize that the first host is the start of a new category
-				firstServer="yes"       # Flag for the first host so we don't try to close the preceding table -- there won't be one. 
-				HOST_TEST_TABLES=''    # This is the var we will insert into the HTML
-				for SERVER in "${JRA_URL_ARRAY[@]}"; do
-					#split the record info fields
-					HOSTNAME=$(echo ${SERVER} | cut -d ',' -f1)
-					PORT=$(echo ${SERVER} | cut -d ',' -f2)
-					PROTOCOL=$(echo ${SERVER} | cut -d ',' -f3)
-					CATEGORY=$(echo ${SERVER} | cut -d ',' -f4)
-					# We have categories of hosts... enrollment, software update, etc. We'll put them in separate tables
-					# If the category for this host is different than the last one and is not blank...
-					if [[ "${lastCategory}" != "${CATEGORY}" ]] && [[ ! -z "${CATEGORY}" ]]; then
-						# If this is not the first server, close up the table from the previous category before moving on to the next. 
-						echo "Starting Category : ${CATEGORY}"
-						if [[ "${firstServer}" != "yes" ]]; then
-							#We've already started the table html so no need to do it again.  
-							HOST_TEST_TABLES+="    </table>${NL}"
-						fi
-						firstServer="no"
-						lastCategory="${CATEGORY}"
-						HOST_TEST_TABLES+="    <h4>${CATEGORY}</h4>${NL}"
-						HOST_TEST_TABLES+="    <table class=\"tg\">${NL}"
-						HOST_TEST_TABLES+="      <tr><th width=\"40%\">HOSTNAME</th><th width=\"50%\">Reverse DNS</th><th width=\"10%\">IP Address</th><th width=\"10%\">Port</th><th width=\"10%\">Protocol</th><th width=\"10%\">Accessible</th><th width=\"20%\">SSL Error</th></tr>${NL}"
-					fi # End of table start and end logic.
-					
-					echo "  > Checking connectivity to: ${HOSTNAME} ${PORT} ${PROTOCOL}"
-					
-					# Now print the info for this host...
-					#Perform Host nslookup to get reported IP
-					IP_ADDRESS=$(/usr/bin/nslookup ${HOSTNAME} | /usr/bin/grep "Address:" | /usr/bin/awk '{print$2}' | /usr/bin/tail -1)
-					
-					
-					#Get Reverse DNS record
-					REVERSE_DNS=$(/usr/bin/dig -x ${IP_ADDRESS} +short | /usr/bin/sed 's/.$//')
-					
-					# Using nc, if proxy defined then adding in proxy flag
-					if [[ ${PROTOCOL} == "TCP" ]]; then
-						if [[ -f "${LOCAL_PROXY_PAC_FILE}" ]]; then
-							PROXY_PARSE_DATA=$(GetProxyHostFromPac ${HOSTNAME} ${PORT})
-							PROXY_HOST=$(echo ${PROXY_PARSE_DATA} | /usr/bin/awk '{print $2}' | /usr/bin/tr -d "';" | /usr/bin/cut -d: -f1)
-							PROXY_PORT=$(echo ${PROXY_PARSE_DATA} | /usr/bin/awk '{print $2}' | /usr/bin/tr -d "';" | /usr/bin/cut -d: -f2)
-						fi
-						
-						#Check if Proxy set
-						if [[ ${PROXY_HOST} == "" ]] && [[ ${PROXY_PORT} == "" ]];then
-							#no proxy set
-							STATUS=$(/usr/bin/nc -z -G 1 ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')	
-						else
-							echo "  > ${PROXY_HOST}:${PROXY_PORT} to be used for ${HOSTNAME}:${PORT}"
-							STATUS=$(/usr/bin/nc -z -G 1 -x ${PROXY_HOST}:${PROXY_PORT} -X connect ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
-						fi
-						
-					elif [[ ${PROTOCOL} == "TCP - non-proxied" ]]; then
-						#for non proxy aware urls we will be using netcat aka nc
-						STATUS=$(/usr/bin/nc -z -G 1 ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
-					else    
-						# UDP goes direct... not proxied. 
-						STATUS=$(/usr/bin/nc -u -z ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
-						
-					fi
-					
-					#Based on Status will set Availability Value
-					if [[ ${STATUS} =~ "succeeded" ]]; then
-						AVAILBILITY="succeeded"
-						
+			for i in $profilesWithConnectLicense; do
+				if [[ "$i" == $connectLicenseInstalled ]]; then
+					printf '<code style="color: %s;">%s<br></code>' "lime" "--Matching Profile found for installed Connect License (com.jamf.connect)." >> $results
+					if [[ $connectDateCompare -ge $connectLicenseExpiration ]]; then
+						printf '<code style="color: %s;">%s<br></code>' "red" "--Currently installed Jamf Connect License is expired." >> $results
 					else
-						AVAILBILITY="failed"
+						printf '<code style="color: %s;">%s<br></code>' "lime" "--Currently installed Jamf Connect License is valid." >> $results
 					fi
-					
-					
-					if [[ "${AVAILBILITY}" == "succeeded" ]]; then
-						AVAILBILITY_STATUS='<td style="color: green;">Available</td>'
-						#Test for SSL Inspection
-						if [[ ${PORT} == "80" ]]; then
-							#http traffic no ssl inspection issues
-							SSL_STATUS='<td style="color: green;">N/A</td>'
-						else
-							if [[ ${PROTOCOL} == "TCP" ]]; then                
-								if [[ ${PROXY_HOST} == "" ]] && [[ ${PROXY_PORT} == "" ]];then
-									CERT_STATUS=$(echo | /usr/bin/openssl s_client -showcerts -connect "${HOSTNAME}:${PORT}" -servername "${HOSTNAME}" 2>/dev/null | /usr/bin/openssl x509 -noout -issuer )
-									
-								else
-									CERT_STATUS=$(echo | /usr/bin/openssl s_client -showcerts -proxy "${PROXY_HOST}:${PROXY_PORT}" -connect "${HOSTNAME}:${PORT}" -servername "${HOSTNAME}" 2>/dev/null | /usr/bin/openssl x509 -noout -issuer)
-								fi
-								
-								if [[ ${CERT_STATUS} != *"Apple Inc"* ]] && [[ "${CERT_STATUS}" != *"Akamai Technologies"* ]] && [[ "${CERT_STATUS}" != *"Amazon"* ]] && [[ "${CERT_STATUS}" != *"DigiCert"* ]] && [[ "${CERT_STATUS}" != *"Microsoft"* ]] && [[ "${CERT_STATUS}" != *"COMODO"* ]] && [[ "${CERT_STATUS}" != *"QuoVadis"* ]]; then
-									
-									SSL_ISSUER=$(echo ${CERT_STATUS} | awk -F'O=|/OU' '{print $2}')
-									
-									if [[ ${HOSTNAME} == *"jcdsdownloads.services.jamfcloud.com" ]];then
-										SSL_STATUS='<td style="color: green;">N/A</td>'
-									else	
-										SSL_STATUS="<td style=\"color: red;\">Unexpected Certificate: ${SSL_ISSUER}</td>"
-									fi
-									
-								else	
-									
-									SSL_STATUS='<td style="color: green;">Successful</td>'
-								fi
-							else
-								SSL_STATUS='<td style="color: green;">N/A</td>'
-							fi
-						fi
-					else
-						# nc did not connect. There is no point in trying the SSL cert subject test. 
-						AVAILBILITY_STATUS='<td style="color: red;">Unavailable</td>'
-						SSL_STATUS='<td style="color: black;">Not checked</td>'
-					fi
-					
-					# Done. Stick the row of info into the HTML var...
-					HOST_TEST_TABLES+="        <tr><td>${HOSTNAME}</td><td>${REVERSE_DNS}</td><td>${IP_ADDRESS}</td><td>${PORT}</td><td>${PROTOCOL}</td>${AVAILBILITY_STATUS}${SSL_STATUS}</tr>${NL}"
-				done
-				# Close up the html for the final table
-				HOST_TEST_TABLES+="    </table>${NL}"
-			}
-			
-			JRA_URL_ARRAY=(
-				#Device setup
-				"us.jra.services.jamfcloud.com,443,TCP,Connection Results"
-				"files.jra.services.jamfcloud.com,443,TCP"
-				"download.jra.services.jamfcloud.com,443,TCP"
-				"relay-1.us.jra.services.jamfcloud.com,443,TCP"
-				"socket.us.jra.services.jamfcloud.com,5555,UDP"
-			)
-			CalculateHostInfoTablesJRA
-			createNetworkCheckTableJRA 
-			
-			log show --style compact --predicate 'subsystem BEGINSWITH "com.jamf.remoteassist"' --debug > $JRA/JRA_debug.log
-		fi
-	}
-	
-	####################################################################################################
-	#Array for App Installers Directory
-	#When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
-	AppInstallers() {
-		mkdir -p $App_Installers
-		if [ -e /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/ ]; then cp -r /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/ directory $App_Installers
-			function createNetworkCheckTableAppInstallers () {
-				/bin/cat << EOF >> "$results"  
-			<p />
-			<h2>App Installers</h2>
-	EOF
-				#Gross for loop that checks for the first report of a failed install and sets the value to true. Avoids a blank return saying App Installer failures found but nothing listed. It is redundant but my limited scripting knowledge only allows for this workaround currently.
-				for file in $App_Installers/_Completed/*; do
-					failedInstall=$(defaults read "$file" InstallFailed 2> /dev/null)
-					if [[ $failedInstall == 1 ]]; then
-						checkForAllFailedInstalls="True"
-						break
-					else
-						checkForAllFailedInstalls="False"
-					fi
-				done
-				if [[ $checkForAllFailedInstalls = "True" ]]; then
-					/bin/cat << EOF >> "$results"
-			<h3>Failed App Installer Check</h3>
-			<p>The following files were found in the app installer logs and show failed installations. If you are troubleshooting failed App Installers, please examine the following files.</p>
-	EOF
-					printf '<code style="color: %s;">%s<br></code>' "red" "Here's a list of failed app installer logs" >> $results
-					touch $App_Installers/commandUUID.txt
-					for file in $App_Installers/_Completed/*; do
-						failedInstall=$(defaults read "$file" InstallFailed 2> /dev/null)
-						commandUUID=$(defaults read "$file" InstallUUID 2> /dev/null)
-						if [[ $failedInstall == 1 ]]; then
-							printf '<code style="color: %s;">%s<br></code>' "yellow" "-$file" >> $results
-							echo "$commandUUID," >> $App_Installers/commandUUID.txt
-						fi
-					done
-					cat $App_Installers/commandUUID.txt  | tr '\n' ' ' > $App_Installers/commandUUID.txt
 				else
-					/bin/cat << EOF >> "$results"
-			<h3>Failed App Installer Check</h3>
-			<p>No failed App Installer files found.</p>
-	EOF
+					printf '<code style="color: %s;">%s<br></code>' "red" "--Mismatch between installed Connect license found in com.jamf.connect.login plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:<br>"
+					printf '<code style="color: %s;">%s<br></code>' "white" "$i " >> $results
+				fi
+			done
+		fi
+	}
+	
+	connectLoginLicenseArray() {
+		if [[ "$connectLoginLicenseInstalled" == "" ]]; then
+			printf '<code style="color: %s;">%s<br></code>' "red" "No License found for com.jamf.connect.login" >> $results
+		else
+			for i in $profilesWithConnectLicense; do
+				if [[ "$i" == $connectLoginLicenseInstalled ]]; then
+					printf '<code style="color: %s;">%s<br></code>' "lime" "--Matching Profile found for installed Connect License (com.jamf.connect.login)." >> $results
+					if [ $connectDateCompare -ge $connectLicenseExpiration ]; then
+						printf '<code style="color: %s;">%s<br></code>' "red" "--Currently installed Jamf Connect License is expired." >> $results
+					else
+						printf '<code style="color: %s;">%s<br></code>' "lime" "--Currently installed Jamf Connect License is valid." >> $results
+					fi
+				else
+					printf '<code style="color: %s;">%s<br></code>' "red" "--Mismatch between installed Connect license found in com.jamf.connect.login plist and an installed profile. Search the profiles.xml file for this license string to see which one profile is attempting to install this license string:<br>"
+					printf '<code style="color: %s;">%s<br></code>' "white" "$i" >> $results
+				fi
+			done	
+		fi
+	}
+	
+	connectLicenseFormatCheck() {
+		PI110629Check=$(awk '/string>PD94/ {count++} END {print count}' "$JSS/profiles.xml")
+		if [[ $PI110629Check -ge "1" ]]; then
+			printf '<code style="color: %s;">%s<br></code>' "red" "Key value assigned to LicenseFile uses string tag and appears to be affected by PI110629" >> $results
+		elif [[ $PI110629Check -le "0" ]]; then
+			printf '<code style="color: %s;">%s<br></code>' "lime" "Key value assigned to LicenseFile uses data tag and does not appear to be affected by PI110629" >> $results
+		fi
+	}
+	if [[ $connectInstalled = "True" ]]; then
+	connectLicenseArray 
+	connectLoginLicenseArray 
+	connectLicenseFormatCheck
+	fi
+}
+
+
+####################################################################################################
+#Array for Jamf Protect Logs
+Protect() {
+	#MAKE DIRECTORY FOR ALL JAMF SECURITY RELATED FILES
+	mkdir -p $log_folder/Jamf_Security
+	printf '<h2>Jamf Protect</h2>' >> $results
+	shopt -s nocasematch
+	
+	case $runProtectDiagnostics in
+		true)
+			if [[ $protectDiagnostics == "" ]]; then 
+				echo "Protect Diagnostics enabled but no existing file found, creating file, please wait up to 5 minutes"
+				protectctl diagnostics -o $HOME/Desktop/ -d 5
+				#need to re-eval protect diagnostics so it sees the file
+				protectDiagnostics=$(ls "$HOME/Desktop/" | grep "JamfProtectDiagnostics")
+				cp "$HOME/Desktop/$protectDiagnostics" "$security"
+				printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files created. Please check Jamf_Security Folder for files." >> $results
+			else
+				echo "Protect Diagnostics found, copying to Jamf Log Grabber"
+				cp "$HOME/Desktop/$protectDiagnostics" "$security"
+				printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been previously ran and the diagnostics folder was found on the desktop of this device." >> $results
+			fi
+		;;
+		*)
+			if [[ $protectDiagnostics != "" ]]; then 
+				echo "Protect Diagnostics found, copying to Jamf Log Grabber"
+				cp "$HOME/Desktop/$protectDiagnostics" "$security"
+				printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Protect diagnostic files found. A 'protectctl diagnostics' command has been previously ran and the diagnostics folder was found on the desktop of this device." >> $results
+			else
+				echo "Protect Diagnostics disabled and no copy found on desktop"
+			fi
+		;;
+	esac
+	#CHECK FOR JAMF PROTECT PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
+	if [ -e /Library/Managed\ Preferences/com.jamf.protect.plist ]; then cp "/Library/Managed Preferences/com.jamf.protect.plist" "$security/com.jamf.protect.plist"
+		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Protect plist found" >> $results
+		plutil -convert xml1 "$security/com.jamf.protect.plist"
+		protectctl info --verbose > $security/jamfprotectinfo.log
+		
+	else
+		printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Protect plist not found" >> $results
+	fi
+	#CHECK FOR JAMF TRUST PLIST, THEN COPY AND CONVERT TO READABLE FORMAT
+	if [ -e /Library/Managed\ Preferences/com.jamf.trust.plist ]; then cp "/Library/Managed Preferences/com.jamf.trust.plist" "$security/com.jamf.trust.plist" 
+		plutil -convert xml1 "$security/com.jamf.trust.plist"
+	else
+		printf '<h2>Jamf Trust</h2>' >> $results
+		printf '<code style="color: %s;">%s<br></code>' "orange" "Jamf Trust plist not found" >> $results
+	fi
+}
+
+####################################################################################################
+#Array for Recon Troubleshoot
+Recon_Troubleshoot() {
+	mkdir -p $log_folder/Recon
+	#check for Jamf Recon leftovers
+	if [[ $reconleftovers == "" ]]; then
+		:
+	else
+		printf '<h2>Recon Troubleshoot</h2>' >> $results
+		echo $reconleftovers > $recon/Leftovers.txt
+		#DIAGNOSTIC INFORMATION FOR RECON RESULTS. FOLLOWING THESE STEPS WILL HELP IDENTIFY PROBLEMATIC EXTENSION ATTRIBUTES AND/OR INVENTORY CHECK IN PROBLEMS
+		echo -e "\nRecon leftovers found and listed above\nTo remediate, take the following steps:\n1. Open the other files in this folder\n2.Find the Extension Attribute that matches the script in this file\n3.Remove or remediate the associate Extension Attribute Script\n4.Confirm by running a 'Sudo Jamf Recon' and verifying the files do not return.\n" >> $recon/Leftovers.txt
+		#REPORT IN RESULTS FILE THAT LEFTOVERS WERE FOUND
+		printf '<code style="color: %s;">%s<br></code>' "white" "Recon Troubleshoot found files in the /tmp directory that should not be there. A report of these files as well as next actions can be found in the Leftovers.txt file in the Recon Directory." >> $results
+		#copy all files in tmp folder to recon results folder
+		cp -r /Library/Application\ Support/Jamf/tmp/ $recon/
+		timefound=`grep -E -i '[0-9]+:[0-9]+' ${jamfLog} | awk '{print $4}' | tail -1`
+		echo $timefound > /dev/null
+		timeFoundNoSeconds=$(echo "${timefound:0:5}${timefound:8:3}")
+		currentTimeNoSeconds=$(echo "${currenttime1:0:5}${currenttime1:8:3}")
+		echo $timeFoundNoSeconds > /dev/null
+		echo $currentTimeNoSeconds > /dev/null
+		if [[ "$timeFoundNoSeconds" == "$currentTimeNoSeconds" ]]; then
+			printf '<code style="color: %s;">%s<br></code>' "Orange" "JLG appears to be running via policy, results in Recon directory may be inaccurate as files are stored there while policies are running." >> $results
+		else
+			printf '<code style="color: %s;">%s<br></code>' "Orange" "JLG appears to have been manually run. Results in Recon directory should be examined closely." >> $results
+		fi
+	fi
+}
+####################################################################################################
+#Array for MDM Communication Check
+#IF A DEVICE IS NOT COMMUNICATING WITH MDM, THIS WILL GIVE ITEMS TO LOOK INTO
+MDMCommunicationCheck() {
+	touch $log_folder/MDMCheck.txt
+	#WRITE TO LOGS WHAT WE ARE DOING NEXT
+	echo -e "Checking $loggedInUser's computer for MDM communication issues:" >> $log_folder/MDMCheck.txt
+	#CHECK MDM STATUS AND ADVISE IF IT IS COMMUNICATING
+	result=$(log show --style compact --predicate '(process CONTAINS "mdmclient")' --last 1d | grep "Unable to create MDM identity")
+	if [[ $result == '' ]]; then
+		echo -e "-MDM is communicating" >> $log_folder/MDMCheck.txt
+	else
+		echo -e "-MDM is broken" >> $log_folder/MDMCheck.txt
+	fi
+	#CHECK FOR THE MDM PROFILE TO BE INSTALLED
+	mdmProfile=$(/usr/libexec/mdmclient QueryInstalledProfiles | grep "00000000-0000-0000-A000-4A414D460003")
+	if [[ $mdmProfile == "" ]]; then
+		echo -e "-MDM Profile Not Installed" >> $log_folder/MDMCheck.txt
+	else
+		echo -e "-MDM Profile Installed" >> $log_folder/MDMCheck.txt
+	fi
+	#TELL THE STATUS OF THE MDM DAEMON
+	mdmDaemonStatus=$(/System/Library/PrivateFrameworks/ApplePushService.framework/apsctl status | grep -A 18 com.apple.aps.mdmclient.daemon.push.production | awk -F':' '/persistent connection status/ {print $NF}' | sed 's/^ *//g')
+	echo -e "-The MDM Daemon Status is:$mdmDaemonStatus" >> $log_folder/MDMCheck.txt
+	#WRITE THE APNS TOPIC TO THE RESULTS FILE IF IT EXISTS
+	profileTopic=$(system_profiler SPConfigurationProfileDataType | grep "Topic" | awk -F '"' '{ print $2 }');
+	if [ "$profileTopic" != "" ]; then
+		echo -e "-APNS Topic is: $profileTopic\n" >> $log_folder/MDMCheck.txt
+	else
+		echo -e "-No APNS Topic Found\n" >> $log_folder/MDMCheck.txt
+	fi
+}
+####################################################################################################
+#Array for Managed Preferences Collection
+Managed_Preferences_Array() {
+	#mkdir -p $log_folder/Managed\ Preferences
+	#CHECK FOR MANAGED PREFERENCE PLISTS, THEN COPY AND CONVERT THEM TO A READABLE FORMAT
+	if [ -e /Library/Managed\ Preferences/ ]; then cp -r /Library/Managed\ Preferences $managed_preferences
+		#SLEEP TO ALLOW COPY TO FINISH PROCESSING ALL FILES
+		sleep 5
+		#UNABLE TO CHECK FOLDER FOR WILDCARD PLIST LIKE *.PLIST
+		plutil -convert xml1 $managed_preferences/*.plist
+		plutil -convert xml1 $managed_preferences/$loggedInUser/*.plist
+		printf '<h2>Managed Preferences</h2>' >> $results
+		checkManagedNotifications=$(plutil -extract NotificationSettings xml1 -o - /Library/Managed\ Preferences/com.apple.notificationsettings.plist | grep "<key>BundleIdentifier</key>" -A 1 | grep "<string>" | sed -E 's|<string>(.*)</string>|\1|')
+		printf '<code style="color: %s;">%s<br></code>' "white" "Managed notifications found for the following applications:" >> $results
+		for app in $checkManagedNotifications; do
+			printf '<code style="color: %s;">\t%s\n<br></code>' "white" "- $app" >> $results
+		done
+	else
+		printf '<h2>Managed Preferences</h2>' >> $results
+		printf '<code style="color: %s;">%s<br></code>' "red" "No Managed Preferences plist files found" >> $results
+	fi
+}
+
+####################################################################################################
+#Array for Device Compliance
+DeviceCompliance() {
+	mkdir -p $log_folder/Device_Compliance
+	log show --predicate 'subsystem CONTAINS "jamfAAD" OR subsystem BEGINSWITH "com.apple.AppSSO"' > $Device_Compliance/JamfConditionalAccess.log
+	if [ -e /Library/Logs/Microsoft/Intune/ ]; then cp /Library/Logs/Microsoft/Intune/*.log $Device_Compliance
+	else
+		printf '<h2>Device Compliance</h2>' >> $results
+		printf '<code style="color: %s;">%s<br></code>' "orange" "Device Compliance system logs not found" >> $results
+	fi
+	if [ -e /$loggedInUser/Logs/Microsoft/Intune/ ]; then cp /Library/Logs/Microsoft/Intune/*.log $Device_Compliance
+	else
+		printf '<code style="color: %s;">%s<br></code>' "orange" "Device Compliance user logs not found" >> $results
+	fi
+	
+}
+
+####################################################################################################
+#Array for Device Compliance
+Remote_Assist() {
+	JRA3Check=$(defaults read /Library/Application\ Support/JAMF/Remote\ Assist/jamfRemoteAssistConnectorUI.app/Contents/Info.plist CFBundleVersion 2>/dev/null)
+	printf '<h2>Jamf Remote Assist</h2>' >> $results
+	if [[ $JRA3Check = "" ]]; then
+		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist not installed, skipping version and network check." >> $results
+	else
+		#ADD JAMF Remote Assist Log Folder
+		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist Version: $JRA3Check" >> $results
+		function createNetworkCheckTableJRA () {
+
+			/bin/cat << EOF >> "$results"  
+		<p />
+		<p>Network access to the following hostnames are required for using Jamf Remote Assist. These hostnames are a small sample as the Relay hostnames can increment up to 100 currently.</p>
+${HOST_TEST_TABLES}
+EOF
+		}
+		
+		
+	function CalculateHostInfoTablesJRA () {
+			echo "[step] Checking URLS"
+			lastCategory="zzzNone"  # Some fake category so we recognize that the first host is the start of a new category
+			firstServer="yes"       # Flag for the first host so we don't try to close the preceding table -- there won't be one. 
+			HOST_TEST_TABLES=''    # This is the var we will insert into the HTML
+			for SERVER in "${JRA_URL_ARRAY[@]}"; do
+				#split the record info fields
+				HOSTNAME=$(echo ${SERVER} | cut -d ',' -f1)
+				PORT=$(echo ${SERVER} | cut -d ',' -f2)
+				PROTOCOL=$(echo ${SERVER} | cut -d ',' -f3)
+				CATEGORY=$(echo ${SERVER} | cut -d ',' -f4)
+				# We have categories of hosts... enrollment, software update, etc. We'll put them in separate tables
+				# If the category for this host is different than the last one and is not blank...
+				if [[ "${lastCategory}" != "${CATEGORY}" ]] && [[ ! -z "${CATEGORY}" ]]; then
+					# If this is not the first server, close up the table from the previous category before moving on to the next. 
+					echo "Starting Category : ${CATEGORY}"
+					if [[ "${firstServer}" != "yes" ]]; then
+						#We've already started the table html so no need to do it again.  
+						HOST_TEST_TABLES+="    </table>${NL}"
+					fi
+					firstServer="no"
+					lastCategory="${CATEGORY}"
+					HOST_TEST_TABLES+="    <h4>${CATEGORY}</h4>${NL}"
+					HOST_TEST_TABLES+="    <table class=\"tg\">${NL}"
+					HOST_TEST_TABLES+="      <tr><th width=\"40%\">HOSTNAME</th><th width=\"50%\">Reverse DNS</th><th width=\"10%\">IP Address</th><th width=\"10%\">Port</th><th width=\"10%\">Protocol</th><th width=\"10%\">Accessible</th><th width=\"20%\">SSL Error</th></tr>${NL}"
+				fi # End of table start and end logic.
+				
+				echo "  > Checking connectivity to: ${HOSTNAME} ${PORT} ${PROTOCOL}"
+				
+				# Now print the info for this host...
+				#Perform Host nslookup to get reported IP
+				IP_ADDRESS=$(/usr/bin/nslookup ${HOSTNAME} | /usr/bin/grep "Address:" | /usr/bin/awk '{print$2}' | /usr/bin/tail -1)
+				
+				
+				#Get Reverse DNS record
+				REVERSE_DNS=$(/usr/bin/dig -x ${IP_ADDRESS} +short | /usr/bin/sed 's/.$//')
+				
+				# Using nc, if proxy defined then adding in proxy flag
+				if [[ ${PROTOCOL} == "TCP" ]]; then
+					if [[ -f "${LOCAL_PROXY_PAC_FILE}" ]]; then
+						PROXY_PARSE_DATA=$(GetProxyHostFromPac ${HOSTNAME} ${PORT})
+						PROXY_HOST=$(echo ${PROXY_PARSE_DATA} | /usr/bin/awk '{print $2}' | /usr/bin/tr -d "';" | /usr/bin/cut -d: -f1)
+						PROXY_PORT=$(echo ${PROXY_PARSE_DATA} | /usr/bin/awk '{print $2}' | /usr/bin/tr -d "';" | /usr/bin/cut -d: -f2)
+					fi
+					
+					#Check if Proxy set
+					if [[ ${PROXY_HOST} == "" ]] && [[ ${PROXY_PORT} == "" ]];then
+						#no proxy set
+						STATUS=$(/usr/bin/nc -z -G 1 ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')	
+					else
+						echo "  > ${PROXY_HOST}:${PROXY_PORT} to be used for ${HOSTNAME}:${PORT}"
+						STATUS=$(/usr/bin/nc -z -G 1 -x ${PROXY_HOST}:${PROXY_PORT} -X connect ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
+					fi
+					
+				elif [[ ${PROTOCOL} == "TCP - non-proxied" ]]; then
+					#for non proxy aware urls we will be using netcat aka nc
+					STATUS=$(/usr/bin/nc -z -G 1 ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
+				else    
+					# UDP goes direct... not proxied. 
+					STATUS=$(/usr/bin/nc -u -z ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
+					
 				fi
 				
-				/bin/cat << EOF >> "$results"
-			<p />		
-			<p>Network access to the following hostname is required for using Jamf's App Installers.</p>
-	${HOST_TEST_TABLES}
-	EOF
-			}
-			function CalculateHostInfoTablesAppInstallers () {
-				echo "[step] Checking URLS"
-				lastCategory="zzzNone"  # Some fake category so we recognize that the first host is the start of a new category
-				firstServer="yes"       # Flag for the first host so we don't try to close the preceding table -- there won't be one. 
-				HOST_TEST_TABLES=''    # This is the var we will insert into the HTML
-				for SERVER in "${APP_Installer_URL_ARRAY[@]}"; do
-					#split the record info fields
-					HOSTNAME=$(echo ${SERVER} | cut -d ',' -f1)
-					PORT=$(echo ${SERVER} | cut -d ',' -f2)
-					PROTOCOL=$(echo ${SERVER} | cut -d ',' -f3)
-					CATEGORY=$(echo ${SERVER} | cut -d ',' -f4)
-					# We have categories of hosts... enrollment, software update, etc. We'll put them in separate tables
-					# If the category for this host is different than the last one and is not blank...
-					if [[ "${lastCategory}" != "${CATEGORY}" ]] && [[ ! -z "${CATEGORY}" ]]; then
-						# If this is not the first server, close up the table from the previous category before moving on to the next. 
-						echo "Starting Category : ${CATEGORY}"
-						if [[ "${firstServer}" != "yes" ]]; then
-							#We've already started the table html so no need to do it again.  
-							HOST_TEST_TABLES+="    </table>${NL}"
-						fi
-						firstServer="no"
-						lastCategory="${CATEGORY}"
-						HOST_TEST_TABLES+="    <h4>${CATEGORY}</h4>${NL}"
-						HOST_TEST_TABLES+="    <table class=\"tg\">${NL}"
-						HOST_TEST_TABLES+="      <tr><th width=\"40%\">HOSTNAME</th><th width=\"50%\">Reverse DNS</th><th width=\"10%\">IP Address</th><th width=\"10%\">Port</th><th width=\"10%\">Protocol</th><th width=\"10%\">Accessible</th><th width=\"20%\">SSL Error</th></tr>${NL}"
-					fi # End of table start and end logic.
+				#Based on Status will set Availability Value
+				if [[ ${STATUS} =~ "succeeded" ]]; then
+					AVAILBILITY="succeeded"
 					
-					echo "  > Checking connectivity to: ${HOSTNAME} ${PORT} ${PROTOCOL}"
-					
-					# Now print the info for this host...
-					#Perform Host nslookup to get reported IP
-					IP_ADDRESS=$(/usr/bin/nslookup ${HOSTNAME} | /usr/bin/grep "Address:" | /usr/bin/awk '{print$2}' | /usr/bin/tail -1)
-					
-					
-					#Get Reverse DNS record
-					REVERSE_DNS=$(/usr/bin/dig -x ${IP_ADDRESS} +short | /usr/bin/sed 's/.$//')
-					
-					# Using nc, if proxy defined then adding in proxy flag
-					if [[ ${PROTOCOL} == "TCP" ]]; then
-						if [[ -f "${LOCAL_PROXY_PAC_FILE}" ]]; then
-							PROXY_PARSE_DATA=$(GetProxyHostFromPac ${HOSTNAME} ${PORT})
-							PROXY_HOST=$(echo ${PROXY_PARSE_DATA} | /usr/bin/awk '{print $2}' | /usr/bin/tr -d "';" | /usr/bin/cut -d: -f1)
-							PROXY_PORT=$(echo ${PROXY_PARSE_DATA} | /usr/bin/awk '{print $2}' | /usr/bin/tr -d "';" | /usr/bin/cut -d: -f2)
-						fi
-						
-						#Check if Proxy set
-						if [[ ${PROXY_HOST} == "" ]] && [[ ${PROXY_PORT} == "" ]];then
-							#no proxy set
-							STATUS=$(/usr/bin/nc -z -G 1 ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')	
-						else
-							echo "  > ${PROXY_HOST}:${PROXY_PORT} to be used for ${HOSTNAME}:${PORT}"
-							STATUS=$(/usr/bin/nc -z -G 1 -x ${PROXY_HOST}:${PROXY_PORT} -X connect ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
-						fi
-						
-					elif [[ ${PROTOCOL} == "TCP - non-proxied" ]]; then
-						#for non proxy aware urls we will be using netcat aka nc
-						STATUS=$(/usr/bin/nc -z -G 1 ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
-					else    
-						# UDP goes direct... not proxied. 
-						STATUS=$(/usr/bin/nc -u -z ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
-						
-					fi
-					
-					#Based on Status will set Availability Value
-					if [[ ${STATUS} =~ "succeeded" ]]; then
-						AVAILBILITY="succeeded"
-						
+				else
+					AVAILBILITY="failed"
+				fi
+				
+				
+				if [[ "${AVAILBILITY}" == "succeeded" ]]; then
+					AVAILBILITY_STATUS='<td style="color: green;">Available</td>'
+					#Test for SSL Inspection
+					if [[ ${PORT} == "80" ]]; then
+						#http traffic no ssl inspection issues
+						SSL_STATUS='<td style="color: green;">N/A</td>'
 					else
-						AVAILBILITY="failed"
-					fi
-					
-					
-					if [[ "${AVAILBILITY}" == "succeeded" ]]; then
-						AVAILBILITY_STATUS='<td style="color: green;">Available</td>'
-						#Test for SSL Inspection
-						if [[ ${PORT} == "80" ]]; then
-							#http traffic no ssl inspection issues
-							SSL_STATUS='<td style="color: green;">N/A</td>'
-						else
-							if [[ ${PROTOCOL} == "TCP" ]]; then                
-								if [[ ${PROXY_HOST} == "" ]] && [[ ${PROXY_PORT} == "" ]];then
-									CERT_STATUS=$(echo | /usr/bin/openssl s_client -showcerts -connect "${HOSTNAME}:${PORT}" -servername "${HOSTNAME}" 2>/dev/null | /usr/bin/openssl x509 -noout -issuer )
-									
-								else
-									CERT_STATUS=$(echo | /usr/bin/openssl s_client -showcerts -proxy "${PROXY_HOST}:${PROXY_PORT}" -connect "${HOSTNAME}:${PORT}" -servername "${HOSTNAME}" 2>/dev/null | /usr/bin/openssl x509 -noout -issuer)
+						if [[ ${PROTOCOL} == "TCP" ]]; then                
+							if [[ ${PROXY_HOST} == "" ]] && [[ ${PROXY_PORT} == "" ]];then
+								CERT_STATUS=$(echo | /usr/bin/openssl s_client -showcerts -connect "${HOSTNAME}:${PORT}" -servername "${HOSTNAME}" 2>/dev/null | /usr/bin/openssl x509 -noout -issuer )
+								
+							else
+								CERT_STATUS=$(echo | /usr/bin/openssl s_client -showcerts -proxy "${PROXY_HOST}:${PROXY_PORT}" -connect "${HOSTNAME}:${PORT}" -servername "${HOSTNAME}" 2>/dev/null | /usr/bin/openssl x509 -noout -issuer)
+							fi
+							
+							if [[ ${CERT_STATUS} != *"Apple Inc"* ]] && [[ "${CERT_STATUS}" != *"Akamai Technologies"* ]] && [[ "${CERT_STATUS}" != *"Amazon"* ]] && [[ "${CERT_STATUS}" != *"DigiCert"* ]] && [[ "${CERT_STATUS}" != *"Microsoft"* ]] && [[ "${CERT_STATUS}" != *"COMODO"* ]] && [[ "${CERT_STATUS}" != *"QuoVadis"* ]]; then
+								
+								SSL_ISSUER=$(echo ${CERT_STATUS} | awk -F'O=|/OU' '{print $2}')
+								
+								if [[ ${HOSTNAME} == *"jcdsdownloads.services.jamfcloud.com" ]];then
+									SSL_STATUS='<td style="color: green;">N/A</td>'
+								else	
+									SSL_STATUS="<td style=\"color: red;\">Unexpected Certificate: ${SSL_ISSUER}</td>"
 								fi
 								
-								if [[ ${CERT_STATUS} != *"Apple Inc"* ]] && [[ "${CERT_STATUS}" != *"Akamai Technologies"* ]] && [[ "${CERT_STATUS}" != *"Amazon"* ]] && [[ "${CERT_STATUS}" != *"DigiCert"* ]] && [[ "${CERT_STATUS}" != *"Microsoft"* ]] && [[ "${CERT_STATUS}" != *"COMODO"* ]] && [[ "${CERT_STATUS}" != *"QuoVadis"* ]]; then
-									
-									SSL_ISSUER=$(echo ${CERT_STATUS} | awk -F'O=|/OU' '{print $2}')
-									
-									if [[ ${HOSTNAME} == *"jcdsdownloads.services.jamfcloud.com" ]];then
-										SSL_STATUS='<td style="color: green;">N/A</td>'
-									else	
-										SSL_STATUS="<td style=\"color: red;\">Unexpected Certificate: ${SSL_ISSUER}</td>"
-									fi
-									
-								else	
-									
-									SSL_STATUS='<td style="color: green;">Successful</td>'
-								fi
-							else
-								SSL_STATUS='<td style="color: green;">N/A</td>'
+							else	
+								
+								SSL_STATUS='<td style="color: green;">Successful</td>'
 							fi
+						else
+							SSL_STATUS='<td style="color: green;">N/A</td>'
 						fi
-					else
-						# nc did not connect. There is no point in trying the SSL cert subject test. 
-						AVAILBILITY_STATUS='<td style="color: red;">Unavailable</td>'
-						SSL_STATUS='<td style="color: black;">Not checked</td>'
+					fi
+				else
+					# nc did not connect. There is no point in trying the SSL cert subject test. 
+					AVAILBILITY_STATUS='<td style="color: red;">Unavailable</td>'
+					SSL_STATUS='<td style="color: black;">Not checked</td>'
+				fi
+				
+				# Done. Stick the row of info into the HTML var...
+				HOST_TEST_TABLES+="        <tr><td>${HOSTNAME}</td><td>${REVERSE_DNS}</td><td>${IP_ADDRESS}</td><td>${PORT}</td><td>${PROTOCOL}</td>${AVAILBILITY_STATUS}${SSL_STATUS}</tr>${NL}"
+			done
+			# Close up the html for the final table
+			HOST_TEST_TABLES+="    </table>${NL}"
+		}
+		
+		JRA_URL_ARRAY=(
+			#Device setup
+			"us.jra.services.jamfcloud.com,443,TCP,Connection Results"
+			"files.jra.services.jamfcloud.com,443,TCP"
+			"download.jra.services.jamfcloud.com,443,TCP"
+			"relay-1.us.jra.services.jamfcloud.com,443,TCP"
+			"socket.us.jra.services.jamfcloud.com,5555,UDP"
+		)
+		CalculateHostInfoTablesJRA
+		createNetworkCheckTableJRA 
+		
+		log show --style compact --predicate 'subsystem BEGINSWITH "com.jamf.remoteassist"' --debug > $JRA/JRA_debug.log
+	fi
+}
+
+####################################################################################################
+#Array for App Installers Directory
+#When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
+AppInstallers() {
+	mkdir -p $App_Installers
+	if [ -e /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/ ]; then cp -r /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/ directory $App_Installers
+		function createNetworkCheckTableAppInstallers () {
+			/bin/cat << EOF >> "$results"  
+		<p />
+		<h2>App Installers</h2>
+EOF
+			#Gross for loop that checks for the first report of a failed install and sets the value to true. Avoids a blank return saying App Installer failures found but nothing listed. It is redundant but my limited scripting knowledge only allows for this workaround currently.
+			for file in $App_Installers/_Completed/*; do
+				failedInstall=$(defaults read "$file" InstallFailed 2> /dev/null)
+				if [[ $failedInstall == 1 ]]; then
+					checkForAllFailedInstalls="True"
+					break
+				else
+					checkForAllFailedInstalls="False"
+				fi
+			done
+			if [[ $checkForAllFailedInstalls = "True" ]]; then
+				/bin/cat << EOF >> "$results"
+		<h3>Failed App Installer Check</h3>
+		<p>The following files were found in the app installer logs and show failed installations. If you are troubleshooting failed App Installers, please examine the following files.</p>
+EOF
+				printf '<code style="color: %s;">%s<br></code>' "red" "Here's a list of failed app installer logs" >> $results
+				touch $App_Installers/commandUUID.txt
+				for file in $App_Installers/_Completed/*; do
+					failedInstall=$(defaults read "$file" InstallFailed 2> /dev/null)
+					commandUUID=$(defaults read "$file" InstallUUID 2> /dev/null)
+					if [[ $failedInstall == 1 ]]; then
+						printf '<code style="color: %s;">%s<br></code>' "yellow" "-$file" >> $results
+						echo "$commandUUID," >> $App_Installers/commandUUID.txt
+					fi
+				done
+				cat $App_Installers/commandUUID.txt  | tr '\n' ' ' > $App_Installers/commandUUID.txt
+			else
+				/bin/cat << EOF >> "$results"
+		<h3>Failed App Installer Check</h3>
+		<p>No failed App Installer files found.</p>
+EOF
+			fi
+			
+			/bin/cat << EOF >> "$results"
+		<p />		
+		<p>Network access to the following hostname is required for using Jamf's App Installers.</p>
+${HOST_TEST_TABLES}
+EOF
+		}
+		function CalculateHostInfoTablesAppInstallers () {
+			echo "[step] Checking URLS"
+			lastCategory="zzzNone"  # Some fake category so we recognize that the first host is the start of a new category
+			firstServer="yes"       # Flag for the first host so we don't try to close the preceding table -- there won't be one. 
+			HOST_TEST_TABLES=''    # This is the var we will insert into the HTML
+			for SERVER in "${APP_Installer_URL_ARRAY[@]}"; do
+				#split the record info fields
+				HOSTNAME=$(echo ${SERVER} | cut -d ',' -f1)
+				PORT=$(echo ${SERVER} | cut -d ',' -f2)
+				PROTOCOL=$(echo ${SERVER} | cut -d ',' -f3)
+				CATEGORY=$(echo ${SERVER} | cut -d ',' -f4)
+				# We have categories of hosts... enrollment, software update, etc. We'll put them in separate tables
+				# If the category for this host is different than the last one and is not blank...
+				if [[ "${lastCategory}" != "${CATEGORY}" ]] && [[ ! -z "${CATEGORY}" ]]; then
+					# If this is not the first server, close up the table from the previous category before moving on to the next. 
+					echo "Starting Category : ${CATEGORY}"
+					if [[ "${firstServer}" != "yes" ]]; then
+						#We've already started the table html so no need to do it again.  
+						HOST_TEST_TABLES+="    </table>${NL}"
+					fi
+					firstServer="no"
+					lastCategory="${CATEGORY}"
+					HOST_TEST_TABLES+="    <h4>${CATEGORY}</h4>${NL}"
+					HOST_TEST_TABLES+="    <table class=\"tg\">${NL}"
+					HOST_TEST_TABLES+="      <tr><th width=\"40%\">HOSTNAME</th><th width=\"50%\">Reverse DNS</th><th width=\"10%\">IP Address</th><th width=\"10%\">Port</th><th width=\"10%\">Protocol</th><th width=\"10%\">Accessible</th><th width=\"20%\">SSL Error</th></tr>${NL}"
+				fi # End of table start and end logic.
+				
+				echo "  > Checking connectivity to: ${HOSTNAME} ${PORT} ${PROTOCOL}"
+				
+				# Now print the info for this host...
+				#Perform Host nslookup to get reported IP
+				IP_ADDRESS=$(/usr/bin/nslookup ${HOSTNAME} | /usr/bin/grep "Address:" | /usr/bin/awk '{print$2}' | /usr/bin/tail -1)
+				
+				
+				#Get Reverse DNS record
+				REVERSE_DNS=$(/usr/bin/dig -x ${IP_ADDRESS} +short | /usr/bin/sed 's/.$//')
+				
+				# Using nc, if proxy defined then adding in proxy flag
+				if [[ ${PROTOCOL} == "TCP" ]]; then
+					if [[ -f "${LOCAL_PROXY_PAC_FILE}" ]]; then
+						PROXY_PARSE_DATA=$(GetProxyHostFromPac ${HOSTNAME} ${PORT})
+						PROXY_HOST=$(echo ${PROXY_PARSE_DATA} | /usr/bin/awk '{print $2}' | /usr/bin/tr -d "';" | /usr/bin/cut -d: -f1)
+						PROXY_PORT=$(echo ${PROXY_PARSE_DATA} | /usr/bin/awk '{print $2}' | /usr/bin/tr -d "';" | /usr/bin/cut -d: -f2)
 					fi
 					
-					# Done. Stick the row of info into the HTML var...
-					HOST_TEST_TABLES+="        <tr><td>${HOSTNAME}</td><td>${REVERSE_DNS}</td><td>${IP_ADDRESS}</td><td>${PORT}</td><td>${PROTOCOL}</td>${AVAILBILITY_STATUS}${SSL_STATUS}</tr>${NL}"
-				done
-				# Close up the html for the final table
-				HOST_TEST_TABLES+="    </table>${NL}"
-			}
-			APP_Installer_URL_ARRAY=(
-				#Device setup
-				"appinstallers-packages.services.jamfcloud.com,443,TCP, Connection Results"
-			)
-			CalculateHostInfoTablesAppInstallers 
-			createNetworkCheckTableAppInstallers
+					#Check if Proxy set
+					if [[ ${PROXY_HOST} == "" ]] && [[ ${PROXY_PORT} == "" ]];then
+						#no proxy set
+						STATUS=$(/usr/bin/nc -z -G 1 ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')	
+					else
+						echo "  > ${PROXY_HOST}:${PROXY_PORT} to be used for ${HOSTNAME}:${PORT}"
+						STATUS=$(/usr/bin/nc -z -G 1 -x ${PROXY_HOST}:${PROXY_PORT} -X connect ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
+					fi
+					
+				elif [[ ${PROTOCOL} == "TCP - non-proxied" ]]; then
+					#for non proxy aware urls we will be using netcat aka nc
+					STATUS=$(/usr/bin/nc -z -G 1 ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
+				else    
+					# UDP goes direct... not proxied. 
+					STATUS=$(/usr/bin/nc -u -z ${HOSTNAME} ${PORT} 2>&1 | /usr/bin/awk '{print $7}')
+					
+				fi
+				
+				#Based on Status will set Availability Value
+				if [[ ${STATUS} =~ "succeeded" ]]; then
+					AVAILBILITY="succeeded"
+					
+				else
+					AVAILBILITY="failed"
+				fi
+				
+				
+				if [[ "${AVAILBILITY}" == "succeeded" ]]; then
+					AVAILBILITY_STATUS='<td style="color: green;">Available</td>'
+					#Test for SSL Inspection
+					if [[ ${PORT} == "80" ]]; then
+						#http traffic no ssl inspection issues
+						SSL_STATUS='<td style="color: green;">N/A</td>'
+					else
+						if [[ ${PROTOCOL} == "TCP" ]]; then                
+							if [[ ${PROXY_HOST} == "" ]] && [[ ${PROXY_PORT} == "" ]];then
+								CERT_STATUS=$(echo | /usr/bin/openssl s_client -showcerts -connect "${HOSTNAME}:${PORT}" -servername "${HOSTNAME}" 2>/dev/null | /usr/bin/openssl x509 -noout -issuer )
+								
+							else
+								CERT_STATUS=$(echo | /usr/bin/openssl s_client -showcerts -proxy "${PROXY_HOST}:${PROXY_PORT}" -connect "${HOSTNAME}:${PORT}" -servername "${HOSTNAME}" 2>/dev/null | /usr/bin/openssl x509 -noout -issuer)
+							fi
+							
+							if [[ ${CERT_STATUS} != *"Apple Inc"* ]] && [[ "${CERT_STATUS}" != *"Akamai Technologies"* ]] && [[ "${CERT_STATUS}" != *"Amazon"* ]] && [[ "${CERT_STATUS}" != *"DigiCert"* ]] && [[ "${CERT_STATUS}" != *"Microsoft"* ]] && [[ "${CERT_STATUS}" != *"COMODO"* ]] && [[ "${CERT_STATUS}" != *"QuoVadis"* ]]; then
+								
+								SSL_ISSUER=$(echo ${CERT_STATUS} | awk -F'O=|/OU' '{print $2}')
+								
+								if [[ ${HOSTNAME} == *"jcdsdownloads.services.jamfcloud.com" ]];then
+									SSL_STATUS='<td style="color: green;">N/A</td>'
+								else	
+									SSL_STATUS="<td style=\"color: red;\">Unexpected Certificate: ${SSL_ISSUER}</td>"
+								fi
+								
+							else	
+								
+								SSL_STATUS='<td style="color: green;">Successful</td>'
+							fi
+						else
+							SSL_STATUS='<td style="color: green;">N/A</td>'
+						fi
+					fi
+				else
+					# nc did not connect. There is no point in trying the SSL cert subject test. 
+					AVAILBILITY_STATUS='<td style="color: red;">Unavailable</td>'
+					SSL_STATUS='<td style="color: black;">Not checked</td>'
+				fi
+				
+				# Done. Stick the row of info into the HTML var...
+				HOST_TEST_TABLES+="        <tr><td>${HOSTNAME}</td><td>${REVERSE_DNS}</td><td>${IP_ADDRESS}</td><td>${PORT}</td><td>${PROTOCOL}</td>${AVAILBILITY_STATUS}${SSL_STATUS}</tr>${NL}"
+			done
+			# Close up the html for the final table
+			HOST_TEST_TABLES+="    </table>${NL}"
+		}
+		APP_Installer_URL_ARRAY=(
+			#Device setup
+			"appinstallers-packages.services.jamfcloud.com,443,TCP, Connection Results"
+		)
+		CalculateHostInfoTablesAppInstallers 
+		createNetworkCheckTableAppInstallers
+else
+		printf '<h2>App Installers</h2>' >> $results
+		printf '<code style="color: %s;">%s<br></code>' "orange" "App Installer Directory not found, device is not in scope for any App Installers or is not receiving the App Installer command from Jamf." >> $results
+	fi
+}
+
+####################################################################################################
+#Array for App Named in Dynamic Variables
+#When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
+CustomApp1Array() {
+	mkdir -p $log_folder/$CustomApp1Name
+	if [ -e $CustomApp1LogSource ] && [ $CustomApp1LogSource != "/" ]; then cp -r $CustomApp1LogSource $CustomApp1Folder
 	else
-			printf '<h2>App Installers</h2>' >> $results
-			printf '<code style="color: %s;">%s<br></code>' "orange" "App Installer Directory not found, device is not in scope for any App Installers or is not receiving the App Installer command from Jamf." >> $results
-		fi
-	}
-	
-	####################################################################################################
-	#Array for App Named in Dynamic Variables
-	#When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
-	CustomApp1Array() {
-		mkdir -p $log_folder/$CustomApp1Name
-		if [ -e $CustomApp1LogSource ] && [ $CustomApp1LogSource != "/" ]; then cp -r $CustomApp1LogSource $CustomApp1Folder
+		printf '<h2>'$CustomApp1Name'</h2>' >> $results
+		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp1Name does not have a log file available to grab or was set to an invalid path." >> $results
+	fi
+}
+
+####################################################################################################
+#Array for App Named in Dynamic Variables
+#When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
+CustomApp2Array() {
+	mkdir -p $log_folder/$CustomApp2Name
+	if [ -e $CustomApp2LogSource ] && [ $CustomApp2LogSource != "/" ]; then cp -r $CustomApp2LogSource $CustomApp2Folder
+	else
+		printf '<h2>'$CustomApp2Name'</h2>' >> $results
+		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp2Name does not have a log file available to grab or was set to an invalid path." >> $results
+	fi
+}
+
+####################################################################################################
+#Array for App Named in Dynamic Variables
+#When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
+CustomApp3Array() {
+	mkdir -p $log_folder/$CustomApp3Name
+	if [ -e $CustomApp3LogSource ] && [ $CustomApp3LogSource != "/" ]; then cp -r $CustomApp3LogSource $CustomApp3Folder
+	else
+		printf '<h2>'$CustomApp3Name'</h2>' >> $results
+		printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp3Name does not have a log file available to grab or was set to an invalid path." >> $results
+	fi
+}
+
+####################################################################################################
+
+#Array for folder cleanup
+Cleanup() {
+	#IF AN ARRAY IS NOT SET TO RUN, REMOVE THE FOLDER NAME FOR IT BELOW TO AVOID ERRORS WITH THE CLEANUP FUNCTION AT THE END OF THE SCRIPT
+	cleanup=("Client_Logs Recon Self_Service Connect Jamf_Security Managed_Preferences Device_Compliance JRA App_Installers $CustomApp1Name $CustomApp2Name $CustomApp3Name")
+	#CLEANS OUT EMPTY FOLDERS TO AVOID CONFUSION
+	printf '<h2>Cleanup Results</h2>' >> $results
+	printf '<code style="color: %s;">%s<br></code>' "white" "The following folders contained no files and were removed:" >> $results
+	for emptyfolder in $cleanup
+	do	
+		if [ -z "$(ls -A /$log_folder/$emptyfolder)" ]; then
+			printf '<code style="color: %s;">%s<br></code>' "yellow" "-$emptyfolder" >> $results
+			rm -r $log_folder/$emptyfolder
 		else
-			printf '<h2>'$CustomApp1Name'</h2>' >> $results
-			printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp1Name does not have a log file available to grab or was set to an invalid path." >> $results
+			:
 		fi
-	}
+	done
+	printf '<code style="color: %s;">%s<br></code>' "white" "Completed Log Grabber on '$(currenttime)'" >> $results
+}
+
+####################################################################################################
+Zip_Folder() {
+	cd $HOME/Desktop
+	#NAME ZIPPED FOLDER WITH LOGGED IN USER
+	zip "$loggedInUser"_"$current_date"_logs.zip -r "$loggedInUser"_"$current_date"_logs
+	rm -r $log_folder
+}
+####################################################################################################
+# Set the Arrays you want to grab.
+# Default Array is logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "App_Installers" "Remote_Assist" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+
+declare -a logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "App_Installers" "Remote_Assist" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
+
+####################################################################################################
+# Put it all together in the Master Array
+
+logGrabberMasterArray() {
+	#CLEAR OUT PREVIOUS RESULTS
+	if [ -e $log_folder ] ;then rm -r $log_folder
+	fi
+	#CREATE A FOLDER TO SAVE ALL LOGS
+	mkdir -p $log_folder
+	#CREATE A LOG FILE FOR SCRIPT AND SAVE TO LOGS DIRECTORY SO ADMINS CAN SEE WHAT LOGS WERE NOT GATHERED
+	touch $results
+	buildHTMLResults 
+	#SET A TIME AND DATE STAMP FOR WHEN THE LOG GRABBER WAS RAN
+	printf '<code style="color: %s;">%s<br></code>' "white" "Log Grabber was started at '$(currenttime)'<br>" >> $results
+	## now loop through the above array
+	for logs in "${logsToGrab[@]}"
+	do
+		echo "$logs"
+		case $logs in
+			Jamf)
+				Jamf 
+			;;
+			Protect)
+				Protect 
+			;;
+			Connect)
+				Connect 
+			;;
+			Recon_Troubleshoot)
+				Recon_Troubleshoot 
+			;;
+			MDM_Communication_Check)
+				MDMCommunicationCheck 
+			;;
+			Managed_Preferences)
+				Managed_Preferences_Array 
+			;;
+			Device_Compliance)
+				DeviceCompliance 
+			;;
+			Remote_Assist)
+				Remote_Assist  
+			;;
+			App_Installers)
+				AppInstallers 
+			;;
+			"$CustomApp1Name")
+				#Add or Remove comment from line below to disable or enable the array for the custom app
+				#CustomApp1Array  
+			;;
+			"$CustomApp2Name")
+				#Add or Remove comment from line below to disable or enable the array for the custom app
+				#CustomApp2Array  
+			;;
+			"$CustomApp3Name")
+				#Add or Remove comment from line below to disable or enable the array for the custom app
+				#CustomApp3Array  
+			;;
+			*)
+				echo "$logs is an invalid variable for the array. Check your spelling or add it to the case argument with your own array" >> $results
+			;;
+		esac
+	done
 	
-	####################################################################################################
-	#Array for App Named in Dynamic Variables
-	#When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
-	CustomApp2Array() {
-		mkdir -p $log_folder/$CustomApp2Name
-		if [ -e $CustomApp2LogSource ] && [ $CustomApp2LogSource != "/" ]; then cp -r $CustomApp2LogSource $CustomApp2Folder
-		else
-			printf '<h2>'$CustomApp2Name'</h2>' >> $results
-			printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp2Name does not have a log file available to grab or was set to an invalid path." >> $results
-		fi
-	}
-	
-	####################################################################################################
-	#Array for App Named in Dynamic Variables
-	#When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
-	CustomApp3Array() {
-		mkdir -p $log_folder/$CustomApp3Name
-		if [ -e $CustomApp3LogSource ] && [ $CustomApp3LogSource != "/" ]; then cp -r $CustomApp3LogSource $CustomApp3Folder
-		else
-			printf '<h2>'$CustomApp3Name'</h2>' >> $results
-			printf '<code style="color: %s;">%s<br></code>' "orange" "$CustomApp3Name does not have a log file available to grab or was set to an invalid path." >> $results
-		fi
-	}
-	
-	####################################################################################################
-	
-	#Array for folder cleanup
-	Cleanup() {
-		#IF AN ARRAY IS NOT SET TO RUN, REMOVE THE FOLDER NAME FOR IT BELOW TO AVOID ERRORS WITH THE CLEANUP FUNCTION AT THE END OF THE SCRIPT
-		cleanup=("Client_Logs Recon Self_Service Connect Jamf_Security Managed_Preferences Device_Compliance JRA App_Installers $CustomApp1Name $CustomApp2Name $CustomApp3Name")
-		#CLEANS OUT EMPTY FOLDERS TO AVOID CONFUSION
-		printf '<h2>Cleanup Results</h2>' >> $results
-		printf '<code style="color: %s;">%s<br></code>' "white" "The following folders contained no files and were removed:" >> $results
-		for emptyfolder in $cleanup
-		do	
-			if [ -z "$(ls -A /$log_folder/$emptyfolder)" ]; then
-				printf '<code style="color: %s;">%s<br></code>' "yellow" "-$emptyfolder" >> $results
-				rm -r $log_folder/$emptyfolder
-			else
-				:
-			fi
-		done
-		printf '<code style="color: %s;">%s<br></code>' "white" "Completed Log Grabber on '$(currenttime)'" >> $results
-	}
-	
-	####################################################################################################
-	Zip_Folder() {
-		cd $HOME/Desktop
-		#NAME ZIPPED FOLDER WITH LOGGED IN USER
-		zip "$loggedInUser"_"$current_date"_logs.zip -r "$loggedInUser"_"$current_date"_logs
-		rm -r $log_folder
-	}
-	####################################################################################################
-	# Set the Arrays you want to grab.
-	# Default Array is logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "App_Installers" "Remote_Assist" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
-	
-	declare -a logsToGrab=("Jamf" "Managed_Preferences" "Protect" "Connect" "Recon_Troubleshoot" "MDM_Communication_Check"  "Device_Compliance" "App_Installers" "Remote_Assist" "$CustomApp1Name" "$CustomApp2Name" "$CustomApp3Name")
-	
-	####################################################################################################
-	# Put it all together in the Master Array
-	
-	logGrabberMasterArray() {
-		#CLEAR OUT PREVIOUS RESULTS
-		if [ -e $log_folder ] ;then rm -r $log_folder
-		fi
-		#CREATE A FOLDER TO SAVE ALL LOGS
-		mkdir -p $log_folder
-		#CREATE A LOG FILE FOR SCRIPT AND SAVE TO LOGS DIRECTORY SO ADMINS CAN SEE WHAT LOGS WERE NOT GATHERED
-		touch $results
-		buildHTMLResults 
-		#SET A TIME AND DATE STAMP FOR WHEN THE LOG GRABBER WAS RAN
-		printf '<code style="color: %s;">%s<br></code>' "white" "Log Grabber was started at '$(currenttime)'<br>" >> $results
-		## now loop through the above array
-		for logs in "${logsToGrab[@]}"
-		do
-			echo "$logs"
-			case $logs in
-				Jamf)
-					Jamf 
-				;;
-				Protect)
-					Protect 
-				;;
-				Connect)
-					Connect 
-				;;
-				Recon_Troubleshoot)
-					Recon_Troubleshoot 
-				;;
-				MDM_Communication_Check)
-					MDMCommunicationCheck 
-				;;
-				Managed_Preferences)
-					Managed_Preferences_Array 
-				;;
-				Device_Compliance)
-					DeviceCompliance 
-				;;
-				Remote_Assist)
-					Remote_Assist  
-				;;
-				App_Installers)
-					AppInstallers 
-				;;
-				"$CustomApp1Name")
-					#Add or Remove comment from line below to disable or enable the array for the custom app
-					#CustomApp1Array  
-				;;
-				"$CustomApp2Name")
-					#Add or Remove comment from line below to disable or enable the array for the custom app
-					#CustomApp2Array  
-				;;
-				"$CustomApp3Name")
-					#Add or Remove comment from line below to disable or enable the array for the custom app
-					#CustomApp3Array  
-				;;
-				*)
-					echo "$logs is an invalid variable for the array. Check your spelling or add it to the case argument with your own array" >> $results
-				;;
-			esac
-		done
-		
-	}
-	
-	#Runs the Log Grabber as configured
-	logGrabberMasterArray 
-	#Run cleanup Array to remove empty folders
-	Cleanup
-	#Zips Results- Comment out or remove the line below to leave the folder unzipped
-	Zip_Folder 
+}
+
+#Runs the Log Grabber as configured
+logGrabberMasterArray 
+#Run cleanup Array to remove empty folders
+Cleanup
+#Zips Results- Comment out or remove the line below to leave the folder unzipped
+Zip_Folder 
