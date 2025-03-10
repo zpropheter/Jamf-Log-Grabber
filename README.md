@@ -25,6 +25,7 @@ Jamf Log Grabber is a bash based script that can be deployed manually, via Jamf 
 - Inventory Troubleshooting: Checks for files left behind during a Jamf Recon command and provides a file name for further investigation
 - Jamf Connect License Check and troubleshooting
 - 3 Custom apps to configure for your own log gathering
+- Jamf Protect Diagnostics: Set Parameter 10 to 'true' in your policy
 
 ## Installation
 
