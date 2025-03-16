@@ -1,5 +1,5 @@
-// Work in progress. Much of the framework is built with AI. This is an attempt make a more efficient process for gathering the logs and potentially add more features like a switch for protectdiagnostics or uploads to third party file providers
-// Currently does not have a results.html or MDM Check.txt. That is coming but slowly. Enjoy if you want to partake. Otherwise the Shell Script is still actively supported and not going anywhere.
+// This is a work in progress. It is fundamentally the same as Jamf Log Grabber. However, there are a few additions to add command line switches as well as converting certain files that can't be done in bash.
+// Results.html is not currently available in the JLG_Swift version
 
 import Foundation
 
@@ -10,19 +10,19 @@ let fileManager = FileManager.default
 func runCommand(_ command: String) -> String {
     let process = Process()
     let pipe = Pipe()
-
+    
     process.executableURL = URL(fileURLWithPath: "/bin/zsh")
     process.arguments = ["-c", command]
     process.standardOutput = pipe
     process.standardError = pipe
-
+    
     do {
         try process.run()
     } catch {
         print("❌ Failed to launch command: \(command)\n\(error.localizedDescription)")
         return ""
     }
-
+    
     let data = pipe.fileHandleForReading.readDataToEndOfFile()
     return String(data: data, encoding: .utf8) ?? ""
 }
@@ -30,7 +30,7 @@ func runCommand(_ command: String) -> String {
 func runAndSave(command: String, outputPath: String) {
     let output = runCommand(command)
     let outputURL = URL(fileURLWithPath: outputPath)
-
+    
     do {
         try output.write(to: outputURL, atomically: true, encoding: .utf8)
         print("✅ Saved command output to: \(outputPath)")
@@ -42,12 +42,12 @@ func runAndSave(command: String, outputPath: String) {
 func copyItem(from sourcePath: String, to destinationPath: String) {
     let sourceURL = URL(fileURLWithPath: sourcePath)
     let destinationURL = URL(fileURLWithPath: destinationPath)
-
+    
     guard fileManager.fileExists(atPath: sourcePath) else {
         print("⚠️ Source not found: \(sourcePath)")
         return
     }
-
+    
     do {
         if fileManager.fileExists(atPath: destinationPath) {
             try fileManager.removeItem(at: destinationURL)
@@ -68,6 +68,17 @@ func createFolder(at path: String) {
         print("❌ Failed to create folder at \(path): \(error.localizedDescription)")
     }
 }
+
+// MARK: - Parse CLI Arguments
+
+let arguments = CommandLine.arguments
+
+let protectDiagnosticsEnabled = arguments.contains("--protectDiagnostics") || arguments.contains("-p")
+let sysdiagnoseEnabled = arguments.contains("--sysdiagnose") || arguments.contains("-s")
+
+print("🚀 Script started with arguments:")
+print("- Protect Diagnostics: \(protectDiagnosticsEnabled ? "ENABLED" : "DISABLED")")
+print("- Sysdiagnose: \(sysdiagnoseEnabled ? "ENABLED" : "DISABLED")")
 
 // MARK: - User & Paths Setup
 
@@ -127,6 +138,43 @@ let jamfSecurityFolder = "\(mainFolderPath)/Jamf_Security"
 let isRoot = (getuid() == 0)
 print(isRoot ? "✅ Running with sudo privileges." : "⚠️ Warning: Not running with sudo. Some files may be inaccessible.")
 
+// MARK: - PROTECTCTL DIAGNOSTICS
+
+if protectDiagnosticsEnabled {
+    let protectDiagnosticsFolder = jamfSecurityFolder
+    print("⏳ Running protectctl diagnostics (this may take a while)...")
+    
+    let protectCommand = "protectctl diagnostics -o '\(protectDiagnosticsFolder)' -d 5"
+    let output = runCommand(protectCommand)
+    
+    print("📝 protectctl diagnostics command output: \(output)")
+    
+    do {
+        let contents = try fileManager.contentsOfDirectory(atPath: protectDiagnosticsFolder)
+        print("📂 protectctl diagnostics output files: \(contents.joined(separator: ", "))")
+    } catch {
+        print("❌ Failed to list protectctl diagnostics folder: \(error.localizedDescription)")
+    }
+    
+    print("✅ protectctl diagnostics completed.")
+}
+
+
+// MARK: - SYSDIAGNOSE
+
+if sysdiagnoseEnabled {
+    let sysdiagnosePath = mainFolderPath
+    print("⏳ Running sysdiagnose (this may take several minutes)...")
+    
+        let sysdiagnoseCommand = "sudo sysdiagnose -u -f'\(sysdiagnosePath)'"
+        let output = runCommand(sysdiagnoseCommand)
+        
+        print("📝 sysdiagnose command output: \(output)")
+
+        print("✅ sysdiagnose completed.")
+    }
+
+
 // MARK: - File Gathering
 
 copyItem(from: "/Library/Receipts/InstallHistory.plist", to: "\(clientLogsPath)/InstallHistory.plist")
@@ -136,7 +184,7 @@ copyItem(from: "\(userHomeDirectory)/Library/Logs/JAMF", to: "\(clientLogsPath)/
 let selfServicePlusAppPath = "/Applications/Self Service+.app"
 if fileManager.fileExists(atPath: selfServicePlusAppPath) {
     let ssPlusLogCommand = """
-    log show --style compact --predicate 'subsystem == "com.jamf.selfserviceplus"' --debug --info --last 1d
+    /usr/bin/log show --style compact --predicate 'subsystem == "com.jamf.selfserviceplus"' --debug --info --last 1d
     """
     runAndSave(command: ssPlusLogCommand, outputPath: "\(clientLogsPath)/SelfService/SelfServicePlus.log")
 } else {
@@ -145,6 +193,103 @@ if fileManager.fileExists(atPath: selfServicePlusAppPath) {
 
 runAndSave(command: "system_profiler -xml", outputPath: "\(clientLogsPath)/SystemReport.spx")
 runAndSave(command: "profiles show -output stdout-xml", outputPath: "\(clientLogsPath)/profiles.xml")
+
+// Convert Profiles XML to JSON
+class XMLToJSONParser: NSObject, XMLParserDelegate {
+    private var resultStack: [[String: Any]] = [[:]]
+    private var currentElement = ""
+    private var currentText = ""
+    private var currentArrayStack: [[Any]] = [[]]
+    
+    func parse(xmlData: Data) -> Data? {
+        let parser = XMLParser(data: xmlData)
+        parser.delegate = self
+        if parser.parse(), let json = resultStack.first {
+            return try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted)
+        }
+        return nil
+    }
+    
+    // XMLParser Delegate Methods
+    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes attributeDict: [String: String] = [:]) {
+        currentElement = elementName
+        currentText = ""
+        
+        if !attributeDict.isEmpty {
+            resultStack.append([elementName: attributeDict])
+        } else if elementName == "dict" || elementName == "array" {
+            resultStack.append([:])
+            currentArrayStack.append([])
+        }
+    }
+    
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        currentText += string.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
+        let trimmedText = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if elementName == "key" {
+            currentElement = trimmedText
+        } else if !trimmedText.isEmpty {
+            if elementName == "integer", let intValue = Int(trimmedText) {
+                resultStack[resultStack.count - 1][currentElement] = intValue
+            } else if elementName == "true" {
+                resultStack[resultStack.count - 1][currentElement] = true
+            } else if elementName == "false" {
+                resultStack[resultStack.count - 1][currentElement] = false
+            } else {
+                resultStack[resultStack.count - 1][currentElement] = trimmedText
+            }
+        } else if elementName == "dict" {
+            let dict = resultStack.popLast() ?? [:]
+            if var last = resultStack.popLast() {
+                if last[currentElement] == nil {
+                    last[currentElement] = dict
+                } else if var existingArray = last[currentElement] as? [[String: Any]] {
+                    existingArray.append(dict)
+                    last[currentElement] = existingArray
+                } else {
+                    last[currentElement] = [last[currentElement], dict]
+                }
+                resultStack.append(last)
+            }
+        } else if elementName == "array" {
+            let array = currentArrayStack.popLast() ?? []
+            if var last = resultStack.popLast() {
+                last[currentElement] = array
+                resultStack.append(last)
+            }
+        }
+        currentText = ""
+    }
+}
+
+
+let profilesLogsPath = "\(clientLogsPath)/profiles.xml"
+// Function to convert XML plist to JSON
+func convertXMLPlistToJSON(filePath: String) {
+    let fileURL = URL(fileURLWithPath: filePath)
+    
+    do {
+        let xmlData = try Data(contentsOf: fileURL)
+        var format = PropertyListSerialization.PropertyListFormat.xml
+        let plistObject = try PropertyListSerialization.propertyList(from: xmlData, options: [], format: &format)
+        
+        let jsonData = try JSONSerialization.data(withJSONObject: plistObject, options: .prettyPrinted)
+        let jsonFilePath = fileURL.deletingPathExtension().appendingPathExtension("json")
+        try jsonData.write(to: jsonFilePath)
+        
+        print("✅ JSON file saved at: \(jsonFilePath.path)")
+    } catch {
+        print("❌ Error: \(error.localizedDescription)")
+    }
+}
+
+// Main execution
+    convertXMLPlistToJSON(filePath: profilesLogsPath)
+
 
 // MARK: - MDM Client Commands
 
@@ -297,4 +442,83 @@ func convertAllPlistsToXMLSwift(atPath path: String) {
         }
     }
 
+// MDMCheck.txt Creation and output
+
+// Function to run a shell command and return its output
+func runShellCommand(_ command: String, arguments: [String] = []) -> String {
+    let process = Process()
+    process.launchPath = command
+    process.arguments = arguments
+    
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    process.standardError = pipe
+    
+    do {
+        try process.run()
+    } catch {
+        return "Error running command: \(command)"
+    }
+    
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+}
+
+// Paths
+
+let mdmCheckFilePath = "\(mainFolderPath)/MDMCheck.txt"
+
+// Start writing the results
+var mdmCheckResults = "MDM Check Report\n=================\n"
+
+// Get the logged-in user
+
+mdmCheckResults += "Checking \(loggedInUser)'s computer for MDM communication issues:\n"
+
+// 1. Check MDM status
+let mdmLog = runShellCommand("/usr/bin/log", arguments: ["show", "--style", "compact", "--predicate", "(process CONTAINS \"mdmclient\")", "--last", "1d"])
+
+if mdmLog.contains("Unable to create MDM identity") {
+    mdmCheckResults += "- MDM is broken\n"
+} else {
+    mdmCheckResults += "- MDM is communicating\n"
+}
+
+// 2. Check if the MDM Profile is installed
+let mdmProfileCheck = runShellCommand("/usr/libexec/mdmclient", arguments: ["QueryInstalledProfiles"])
+if mdmProfileCheck.contains("00000000-0000-0000-A000-4A414D460003") {
+    mdmCheckResults += "- MDM Profile Installed\n"
+} else {
+    mdmCheckResults += "- MDM Profile Not Installed\n"
+}
+
+// 3. Get the MDM Daemon Status
+let apsctlStatus = runShellCommand("/System/Library/PrivateFrameworks/ApplePushService.framework/apsctl", arguments: ["status"])
+let daemonLines = apsctlStatus.components(separatedBy: "\n")
+if let daemonLine = daemonLines.first(where: { $0.contains("persistent connection status") }) {
+    let statusValue = daemonLine.components(separatedBy: ":").last?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Unknown"
+    mdmCheckResults += "- The MDM Daemon Status is: \(statusValue)\n"
+} else {
+    mdmCheckResults += "- MDM Daemon Status: Not Found\n"
+}
+
+// 4. Get the APNS Topic
+let configProfiles = runShellCommand("/usr/sbin/system_profiler", arguments: ["SPConfigurationProfileDataType"])
+let topicLine = configProfiles.components(separatedBy: "\n").first(where: { $0.contains("Topic") })
+
+if let topic = topicLine?.components(separatedBy: "\"").dropFirst(1).first {
+    mdmCheckResults += "- APNS Topic is: \(topic)\n"
+} else {
+    mdmCheckResults += "- No APNS Topic Found\n"
+}
+
+// Write to the MDMCheck.txt file
+do {
+    try mdmCheckResults.write(toFile: mdmCheckFilePath, atomically: true, encoding: .utf8)
+    print("✅ MDMCheck.txt created at \(mdmCheckFilePath)")
+} catch {
+    print("❌ Failed to write MDMCheck.txt: \(error.localizedDescription)")
+}
+
 print("✅ Log gathering complete! Files are saved to: \(mainFolderPath)")
+
