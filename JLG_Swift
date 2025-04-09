@@ -1,3 +1,10 @@
+//
+//  JLG_Swift.swift
+//  
+//  Created by Zach Propheter on
+//  Updated by Paull Stanley on 3/22/25.
+//  Jamf Trust Diag added on 4/9/25
+
 import Foundation
 
 let fileManager = FileManager.default
@@ -439,6 +446,169 @@ func convertAllPlistsToXMLSwift(atPath path: String) {
         }
     }
 
+
+// Define constants
+let domains = ["map.wandera.com", "jamf.com"]
+let ports = [80, 443]
+let includeDNSTests = true
+let includeCurlTests = true
+let includePortTests = true
+let includePingTests = true
+let pingCount = 4
+let curlTimeout: TimeInterval = 5
+let portTimeout: TimeInterval = 2
+let sleepWait: TimeInterval = 10
+
+let unixTimeStamp = Int(Date().timeIntervalSince1970)
+let outputPath = "\(jamfSecurityFolder)"
+var pathToOutput = "\(outputPath)/JamfTrustDiagnostics.txt"
+
+// Function to run the tests (your existing code)
+func jamfTrustDiagnostics() {
+    func postDateTime() {
+        let utcDateTime = DateFormatter()
+        utcDateTime.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let dateStr = utcDateTime.string(from: Date())
+        try? "\(dateStr)\n".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func listSystemDetails() {
+        try? "\n---------------------------------- System Details ----------------------------------\n".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+        postMacOSVersion()
+        postNameServers()
+        postSystemExtensions()
+        postNetworkServices()
+        postIfConfig()
+        postNetStat()
+        try? "\n---------------------------------- System Details ----------------------------------\n".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func postMacOSVersion() {
+        let macOSVersion = runCommand("sw_vers")
+        try? "\nMacOS Version:\n\(macOSVersion)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func postNameServers() {
+        let nameServers = runCommand("scutil --dns | grep 'nameserver\\[[0-9]*\\]'")
+        try? "\nNameservers:\n\(nameServers)\n".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func postSystemExtensions() {
+        let extensions = runCommand("systemextensionsctl list")
+        try? "\nSystem Extensions:\n\(extensions)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func postNetworkServices() {
+        let services = runCommand("networksetup -listallnetworkservices")
+        try? "\nNetwork Services:\n\(services)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func postIfConfig() {
+        let ifConfig = runCommand("ifconfig -a -v")
+        try? "\nifconfig:\n\(ifConfig)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func postNetStat() {
+        let netStat = runCommand("netstat -rn")
+        try? "\nnetstat:\n\(netStat)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func runCommand(_ command: String) -> String {
+        let task = Process()
+        let pipe = Pipe()
+        
+        task.executableURL = URL(fileURLWithPath: "/bin/bash")
+        task.arguments = ["-c", command]
+        task.standardOutput = pipe
+        
+        do {
+            try task.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8) ?? ""
+        } catch {
+            return "Error running command: \(command)"
+        }
+    }
+    
+    func postResults(_ result: String) {
+        try? result.write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func pingTests(domain: String) {
+        let pingTest = runCommand("ping -c \(pingCount) \(domain) 2>&1")
+        let ping6Test = runCommand("ping6 -c \(pingCount) \(domain) 2>&1")
+        
+        try? "\nPing (IPV4):\n\(pingTest)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+        try? "\nPing (IPV6):\n\(ping6Test)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func curlTests(domain: String) {
+        let curlHttpTest = runCommand("curl -L -m \(curlTimeout) --silent --head http://\(domain) | awk '/^HTTP/'")
+        let curlHttpsTest = runCommand("curl -L -m \(curlTimeout) --silent --head https://\(domain) | awk '/^HTTP/'")
+        
+        try? "\n\nHTTP Request:\n\(curlHttpTest)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+        try? "\n\nHTTPS Request:\n\(curlHttpsTest)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func dnsTests(domain: String) {
+        let result = runCommand("host \(domain) | awk '{print $NF}'")
+        let dnsServer = runCommand("dig \(domain) | grep ';; SERVER:' | awk '{ $1=$2=\"\"; print $0 }' | sed 's/^[ \\t]*//'")
+        
+        try? "Domain: \(domain)\nResults: \(result)\nDNS Server being queried: \(dnsServer)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func portTests(domain: String) {
+        try? "\n\nPort Tests:\n".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+        for port in ports {
+            let portTest = runCommand("nc -z -v -w \(Int(portTimeout)) \(domain) \(port) 2>&1")
+            try? "\(portTest)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+        }
+    }
+    
+    func doTests() {
+        for domain in domains {
+            try? "\n---------------------------------- Tests for \(domain) ----------------------------------\n".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+            
+            if includeDNSTests { dnsTests(domain: domain) }
+            if includePingTests { pingTests(domain: domain) }
+            if includeCurlTests { curlTests(domain: domain) }
+            if includePortTests { portTests(domain: domain) }
+        }
+    }
+    
+    func run() {
+        try? FileManager.default.createDirectory(atPath: outputPath, withIntermediateDirectories: true, attributes: nil)
+        pathToOutput = "\(outputPath)/JamfTrustDiagnostics.txt"
+        
+        try? "\n=============================== Jamf Trust ===============================\n".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+        postDateTime()
+        doTests()
+        listSystemDetails()
+        try? "\n=============================== Jamf Trust ===============================\n".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+        
+    }
+    
+    run()
+}
+
+// Check for the presence of the file before running the tests
+func checkAndTrustDiagnostics() {
+    let filePath = "/Library/Managed Preferences/com.jamf.trust.plist"
+    let fileManager = FileManager.default
+    
+    if fileManager.fileExists(atPath: filePath) {
+        // File exists, run the tests
+        print("✅ File found. Running the tests...")
+        jamfTrustDiagnostics()
+    } else {
+        // File doesn't exist, print a message
+        print("❌ File not found at \(filePath). Skipping tests.")
+    }
+}
+
+// Call the function to check and run tests
+checkAndTrustDiagnostics()
+
 // MDMCheck.txt Creation and output
 
 // Function to run a shell command and return its output
@@ -519,3 +689,4 @@ do {
 
 print("✅ Log gathering complete! Files are saved to: \(mainFolderPath)")
 
+        
