@@ -371,7 +371,7 @@ if jamfConnectBinary.isEmpty, fileManager.fileExists(atPath: "/usr/local/bin/jam
 }
 
 if !jamfConnectBinary.isEmpty {
-    _ = runCommand("\(jamfConnectBinary) -logs")
+    _ = runCommand("\(jamfConnectBinary) logs")
 
     let logsSource = "/Library/Application Support/JamfConnect/Logs"
     if let items = try? fileManager.contentsOfDirectory(atPath: logsSource),
