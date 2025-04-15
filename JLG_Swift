@@ -1,0 +1,692 @@
+//
+//  JLG_Swift.swift
+//  
+//  Created by Zach Propheter on
+//  Updated by Paull Stanley on 3/22/25.
+//  Jamf Trust Diag added on 4/9/25
+
+import Foundation
+
+let fileManager = FileManager.default
+
+// MARK: - Helper Functions
+
+func runCommand(_ command: String) -> String {
+    let process = Process()
+    let pipe = Pipe()
+    
+    process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+    process.arguments = ["-c", command]
+    process.standardOutput = pipe
+    process.standardError = pipe
+    
+    do {
+        try process.run()
+    } catch {
+        print("❌ Failed to launch command: \(command)\n\(error.localizedDescription)")
+        return ""
+    }
+    
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    return String(data: data, encoding: .utf8) ?? ""
+}
+
+func runAndSave(command: String, outputPath: String) {
+    let output = runCommand(command)
+    let outputURL = URL(fileURLWithPath: outputPath)
+    
+    do {
+        try output.write(to: outputURL, atomically: true, encoding: .utf8)
+        print("✅ Saved command output to: \(outputPath)")
+    } catch {
+        print("❌ Failed to save output to \(outputPath): \(error.localizedDescription)")
+    }
+}
+
+func copyItem(from sourcePath: String, to destinationPath: String) {
+    let sourceURL = URL(fileURLWithPath: sourcePath)
+    let destinationURL = URL(fileURLWithPath: destinationPath)
+    
+    guard fileManager.fileExists(atPath: sourcePath) else {
+        print("⚠️ Source not found: \(sourcePath)")
+        return
+    }
+    
+    do {
+        if fileManager.fileExists(atPath: destinationPath) {
+            try fileManager.removeItem(at: destinationURL)
+        }
+        try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        print("✅ Copied \(sourcePath) to \(destinationPath)")
+    } catch {
+        print("❌ Copy failed from \(sourcePath) to \(destinationPath): \(error.localizedDescription)")
+    }
+}
+
+func createFolder(at path: String) {
+    let folderURL = URL(fileURLWithPath: path)
+    do {
+        try fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true, attributes: nil)
+        print("📁 Created folder: \(path)")
+    } catch {
+        print("❌ Failed to create folder at \(path): \(error.localizedDescription)")
+    }
+}
+
+// MARK: - Parse CLI Arguments
+
+let arguments = CommandLine.arguments
+
+let protectDiagnosticsEnabled = arguments.contains("--protectDiagnostics") || arguments.contains("-p")
+let sysdiagnoseEnabled = arguments.contains("--sysdiagnose") || arguments.contains("-s")
+
+print("🚀 Script started with arguments:")
+print("- Protect Diagnostics: \(protectDiagnosticsEnabled ? "ENABLED" : "DISABLED")")
+print("- Sysdiagnose: \(sysdiagnoseEnabled ? "ENABLED" : "DISABLED")")
+
+// MARK: - User & Paths Setup
+
+let loggedInUser = runCommand("stat -f%Su /dev/console").trimmingCharacters(in: .whitespacesAndNewlines)
+let userHomeDirectory = "/Users/\(loggedInUser)"
+let desktopDirectory = "\(userHomeDirectory)/Desktop"
+
+// Timestamp & main folder
+let formatter = DateFormatter()
+formatter.dateFormat = "MM-dd-yyyy"
+let dateString = formatter.string(from: Date())
+let mainFolderName = "\(loggedInUser)_\(dateString)_logs"
+let mainFolderPath = "\(desktopDirectory)/\(mainFolderName)"
+
+// Rename existing folder if necessary
+if fileManager.fileExists(atPath: mainFolderPath) {
+    let oldFolderPath = "\(mainFolderPath)_old"
+    do {
+        if fileManager.fileExists(atPath: oldFolderPath) {
+            try fileManager.removeItem(atPath: oldFolderPath)
+        }
+        try fileManager.moveItem(atPath: mainFolderPath, toPath: oldFolderPath)
+        print("📦 Renamed existing folder to: \(oldFolderPath)")
+    } catch {
+        print("❌ Failed to rename existing folder: \(error.localizedDescription)")
+    }
+}
+
+// MARK: - Create Folder Structure
+
+createFolder(at: mainFolderPath)
+
+let folders = [
+    "Client_Logs",
+    "Managed_Preferences",
+    "Client_Logs/SoftwareUpdates",
+    "Client_Logs/DDM",
+    "Client_Logs/DiagnosticReports",
+    "App_Installers",
+    "Jamf_Security",
+    "Device_Compliance",
+    "Connect"
+]
+
+folders.forEach {
+    createFolder(at: "\(mainFolderPath)/\($0)")
+}
+
+let clientLogsPath = "\(mainFolderPath)/Client_Logs"
+let managedPrefsPath = "\(mainFolderPath)/Managed_Preferences"
+let softwareUpdatesPath = "\(clientLogsPath)/SoftwareUpdates"
+let ddmPath = "\(clientLogsPath)/DDM"
+let jamfSecurityFolder = "\(mainFolderPath)/Jamf_Security"
+
+// MARK: - Sudo Privileges Check
+
+let isRoot = (getuid() == 0)
+print(isRoot ? "✅ Running with sudo privileges." : "⚠️ Warning: Not running with sudo. Some files may be inaccessible.")
+
+// MARK: - PROTECTCTL DIAGNOSTICS
+
+if protectDiagnosticsEnabled {
+    let protectDiagnosticsFolder = jamfSecurityFolder
+    print("⏳ Running protectctl diagnostics (this may take a while)...")
+    
+    let protectCommand = "protectctl diagnostics -o '\(protectDiagnosticsFolder)' -d 5"
+    let output = runCommand(protectCommand)
+    
+    print("📝 protectctl diagnostics command output: \(output)")
+    
+    do {
+        let contents = try fileManager.contentsOfDirectory(atPath: protectDiagnosticsFolder)
+        print("📂 protectctl diagnostics output files: \(contents.joined(separator: ", "))")
+    } catch {
+        print("❌ Failed to list protectctl diagnostics folder: \(error.localizedDescription)")
+    }
+    
+    print("✅ protectctl diagnostics completed.")
+}
+
+
+// MARK: - SYSDIAGNOSE
+
+if sysdiagnoseEnabled {
+    let sysdiagnosePath = mainFolderPath
+    print("⏳ Running sysdiagnose (this may take several minutes)...")
+    
+        let sysdiagnoseCommand = "sudo sysdiagnose -u -f'\(sysdiagnosePath)'"
+        let output = runCommand(sysdiagnoseCommand)
+        
+        print("📝 sysdiagnose command output: \(output)")
+
+        print("✅ sysdiagnose completed.")
+    }
+
+
+// MARK: - File Gathering
+
+copyItem(from: "/Library/Receipts/InstallHistory.plist", to: "\(clientLogsPath)/InstallHistory.plist")
+copyItem(from: "/Library/Managed Preferences", to: managedPrefsPath)
+copyItem(from: "\(userHomeDirectory)/Library/Logs/JAMF", to: "\(clientLogsPath)/SelfService")
+
+let selfServicePlusAppPath = "/Applications/Self Service+.app"
+if fileManager.fileExists(atPath: selfServicePlusAppPath) {
+    let ssPlusLogCommand = """
+    /usr/bin/log show --style compact --predicate 'subsystem == "com.jamf.selfserviceplus"' --debug --info --last 1d
+    """
+    runAndSave(command: ssPlusLogCommand, outputPath: "\(clientLogsPath)/SelfService/SelfServicePlus.log")
+} else {
+    print("ℹ️ Self Service+ not installed.")
+}
+
+runAndSave(command: "system_profiler -xml", outputPath: "\(clientLogsPath)/SystemReport.spx")
+runAndSave(command: "profiles show -output stdout-xml", outputPath: "\(clientLogsPath)/profiles.xml")
+
+// Convert Profiles XML to JSON
+class XMLToJSONParser: NSObject, XMLParserDelegate {
+    private var resultStack: [[String: Any]] = [[:]]
+    private var currentElement = ""
+    private var currentText = ""
+    private var currentArrayStack: [[Any]] = [[]]
+    
+    func parse(xmlData: Data) -> Data? {
+        let parser = XMLParser(data: xmlData)
+        parser.delegate = self
+        if parser.parse(), let json = resultStack.first {
+            return try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted)
+        }
+        return nil
+    }
+    
+    // XMLParser Delegate Methods
+    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes attributeDict: [String: String] = [:]) {
+        currentElement = elementName
+        currentText = ""
+        
+        if !attributeDict.isEmpty {
+            resultStack.append([elementName: attributeDict])
+        } else if elementName == "dict" || elementName == "array" {
+            resultStack.append([:])
+            currentArrayStack.append([])
+        }
+    }
+    
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        currentText += string.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
+        let trimmedText = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if elementName == "key" {
+            currentElement = trimmedText
+        } else if !trimmedText.isEmpty {
+            if elementName == "integer", let intValue = Int(trimmedText) {
+                resultStack[resultStack.count - 1][currentElement] = intValue
+            } else if elementName == "true" {
+                resultStack[resultStack.count - 1][currentElement] = true
+            } else if elementName == "false" {
+                resultStack[resultStack.count - 1][currentElement] = false
+            } else {
+                resultStack[resultStack.count - 1][currentElement] = trimmedText
+            }
+        } else if elementName == "dict" {
+            let dict = resultStack.popLast() ?? [:]
+            if var last = resultStack.popLast() {
+                if last[currentElement] == nil {
+                    last[currentElement] = dict
+                } else if var existingArray = last[currentElement] as? [[String: Any]] {
+                    existingArray.append(dict)
+                    last[currentElement] = existingArray
+                } else {
+                    last[currentElement] = [last[currentElement], dict]
+                }
+                resultStack.append(last)
+            }
+        } else if elementName == "array" {
+            let array = currentArrayStack.popLast() ?? []
+            if var last = resultStack.popLast() {
+                last[currentElement] = array
+                resultStack.append(last)
+            }
+        }
+        currentText = ""
+    }
+}
+
+
+let profilesLogsPath = "\(clientLogsPath)/profiles.xml"
+// Function to convert XML plist to JSON
+func convertXMLPlistToJSON(filePath: String) {
+    let fileURL = URL(fileURLWithPath: filePath)
+    
+    do {
+        let xmlData = try Data(contentsOf: fileURL)
+        var format = PropertyListSerialization.PropertyListFormat.xml
+        let plistObject = try PropertyListSerialization.propertyList(from: xmlData, options: [], format: &format)
+        
+        let jsonData = try JSONSerialization.data(withJSONObject: plistObject, options: .prettyPrinted)
+        let jsonFilePath = fileURL.deletingPathExtension().appendingPathExtension("json")
+        try jsonData.write(to: jsonFilePath)
+        
+        print("✅ JSON file saved at: \(jsonFilePath.path)")
+    } catch {
+        print("❌ Error: \(error.localizedDescription)")
+    }
+}
+
+// Main execution
+    convertXMLPlistToJSON(filePath: profilesLogsPath)
+
+
+// MARK: - MDM Client Commands
+
+let mdmCommands: [(String, String)] = [
+    ("/usr/libexec/mdmclient AvailableOSUpdates", "\(softwareUpdatesPath)/AvailableOSUpdates.txt"),
+    ("/usr/libexec/mdmclient QueryDeviceInformation", "\(clientLogsPath)/QueryDeviceInformation.txt"),
+    ("/usr/libexec/mdmclient DumpManagementStatus", "\(clientLogsPath)/DumpManagementStatus.txt")
+]
+
+mdmCommands.forEach { runAndSave(command: $0.0, outputPath: $0.1) }
+
+// MARK: - Additional Logs & Copies
+
+runAndSave(command: "launchctl dumpstate", outputPath: "\(clientLogsPath)/launchctl_dumpstate.txt")
+runAndSave(command: "systemextensionsctl list", outputPath: "\(clientLogsPath)/system_extensions.txt")
+runAndSave(command: "kextstat", outputPath: "\(clientLogsPath)/kextstat.txt")
+runAndSave(command: "cat /Library/Application\\ Support/JAMF/.jmf_settings.json", outputPath: "\(clientLogsPath)/restricted_software.json")
+
+copyItem(from: "/System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/SoftwareUpdateSubscriber.xpc/Contents/Info.plist", to: "\(softwareUpdatesPath)/ClientInfo.plist")
+copyItem(from: "/private/var/db/softwareupdate/SoftwareUpdateDDMStatePersistence.plist", to: "\(softwareUpdatesPath)/DDM.plist")
+
+// DDM XPC Info Plist collection
+let xpcServicesPath = "/System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices"
+if let xpcContents = try? fileManager.contentsOfDirectory(atPath: xpcServicesPath) {
+    for item in xpcContents where item.hasSuffix(".xpc") && item != "SoftwareUpdateSubscriber.xpc" {
+        let infoPlistPath = "\(xpcServicesPath)/\(item)/Contents/Info.plist"
+        let destPlistPath = "\(ddmPath)/\(item)_Info.plist"
+        copyItem(from: infoPlistPath, to: destPlistPath)
+    }
+}
+
+copyItem(from: "/Library/Logs/DiagnosticReports", to: "\(clientLogsPath)/DiagnosticReports")
+
+// MARK: - App Installers & Flagged Installs
+
+copyItem(from: "/var/db/ConfigurationProfiles/Settings/Managed Applications/Device", to: "\(mainFolderPath)/App_Installers")
+
+let completedPath = "/var/db/ConfigurationProfiles/Settings/Managed Applications/Device/_completed"
+let flaggedFilesPath = "\(mainFolderPath)/App_Installers/Flagged_Installers.txt"
+
+if fileManager.fileExists(atPath: completedPath) {
+    do {
+        let files = try fileManager.contentsOfDirectory(atPath: completedPath)
+        let flaggedFiles = files.filter {
+            let installFailedOutput = runCommand("defaults read '\(completedPath)/\($0)' InstallFailed")
+            return installFailedOutput.trimmingCharacters(in: .whitespacesAndNewlines) == "1" || installFailedOutput.lowercased().contains("true")
+        }
+
+        let flaggedOutput = flaggedFiles.isEmpty ? "No failed installers found." : flaggedFiles.joined(separator: "\n")
+        try flaggedOutput.write(toFile: flaggedFilesPath, atomically: true, encoding: .utf8)
+
+        print("✅ Flagged installers report saved at \(flaggedFilesPath)")
+    } catch {
+        print("❌ Error scanning _completed folder: \(error.localizedDescription)")
+    }
+} else {
+    print("⚠️ No _completed folder found at \(completedPath)")
+}
+
+// MARK: - Jamf Security & Device Compliance Logs
+
+if !runCommand("which protectctl").isEmpty {
+    runAndSave(command: "protectctl info --verbose", outputPath: "\(mainFolderPath)/Jamf_Security/jamfprotectinfo.log")
+} else {
+    print("⚠️ protectctl not found on this system.")
+}
+
+runAndSave(command: "log show --predicate 'subsystem CONTAINS \"jamfAAD\" OR subsystem BEGINSWITH \"com.apple.AppSSO\"'", outputPath: "\(mainFolderPath)/Device_Compliance/JamfConditionalAccess.log")
+
+// MARK: - Jamf Connect Logs
+
+var jamfConnectBinary = runCommand("which jamfconnect").trimmingCharacters(in: .whitespacesAndNewlines)
+if jamfConnectBinary.isEmpty, fileManager.fileExists(atPath: "/usr/local/bin/jamfconnect") {
+    jamfConnectBinary = "/usr/local/bin/jamfconnect"
+}
+
+if !jamfConnectBinary.isEmpty {
+    _ = runCommand("\(jamfConnectBinary) logs")
+
+    let logsSource = "/Library/Application Support/JamfConnect/Logs"
+    if let items = try? fileManager.contentsOfDirectory(atPath: logsSource),
+       let zipFile = items.first(where: { $0.hasSuffix(".zip") }) {
+        _ = runCommand("unzip -o '\(logsSource)/\(zipFile)' -d '\(mainFolderPath)/Connect'")
+        print("✅ Extracted Jamf Connect logs.")
+    } else {
+        print("⚠️ Jamf Connect logs not found.")
+    }
+} else {
+    print("⚠️ Jamf Connect binary not found. Skipping.")
+}
+
+// MARK: - Recon Folder for JAMF tmp
+
+if runCommand("ps -acx | grep 'jamf$'").isEmpty {
+    createFolder(at: "\(mainFolderPath)/Recon")
+    copyItem(from: "/Library/Application Support/JAMF/tmp/", to: "\(mainFolderPath)/Recon")
+} else {
+    print("⚠️ Jamf process is running. Skipping Recon.")
+}
+
+// MARK: - Plist Conversion
+
+func convertPlistToXMLSwift(inputPath: String) {
+    guard let plistData = fileManager.contents(atPath: inputPath) else {
+        print("❌ Failed to read plist at \(inputPath)")
+        return
+    }
+
+    do {
+        let plistObject = try PropertyListSerialization.propertyList(from: plistData, options: [], format: nil)
+        let xmlData = try PropertyListSerialization.data(fromPropertyList: plistObject, format: .xml, options: 0)
+        try xmlData.write(to: URL(fileURLWithPath: inputPath))
+        print("✅ Converted plist to XML: \(inputPath)")
+    } catch {
+        print("❌ Error converting plist at \(inputPath): \(error.localizedDescription)")
+    }
+}
+
+func convertAllPlistsToXMLSwift(atPath path: String) {
+    guard let enumerator = fileManager.enumerator(atPath: path) else {
+        print("❌ Failed to enumerate: \(path)")
+        return
+    }
+
+    for case let file as String in enumerator where file.hasSuffix(".plist") {
+        convertPlistToXMLSwift(inputPath: "\(path)/\(file)")
+    }
+}
+
+[clientLogsPath, managedPrefsPath, softwareUpdatesPath, ddmPath, "\(mainFolderPath)/App_Installers", "\(mainFolderPath)/Connect"]
+    .forEach { convertAllPlistsToXMLSwift(atPath: $0) }
+    
+// Move Security Plists
+    // Plist files to look for
+    let securityPlists = ["com.jamf.trust.plist", "com.jamf.protect.plist"]
+    
+    for plist in securityPlists {
+        let sourcePlistPath = "\(managedPrefsPath)/\(plist)"
+        let destPlistPath = "\(jamfSecurityFolder)/\(plist)"
+        
+        if fileManager.fileExists(atPath: sourcePlistPath) {
+            do {
+                try fileManager.copyItem(atPath: sourcePlistPath, toPath: destPlistPath)
+                print("✅ Copied \(plist) from Managed_Preferences to Jamf_Security.")
+            } catch {
+                print("❌ Failed to copy \(plist): \(error.localizedDescription)")
+            }
+        } else {
+            print("⚠️ \(plist) not found in Managed_Preferences.")
+        }
+    }
+
+
+// Define constants
+let domains = ["map.wandera.com", "jamf.com"]
+let ports = [80, 443]
+let includeDNSTests = true
+let includeCurlTests = true
+let includePortTests = true
+let includePingTests = true
+let pingCount = 4
+let curlTimeout: TimeInterval = 5
+let portTimeout: TimeInterval = 2
+let sleepWait: TimeInterval = 10
+
+let unixTimeStamp = Int(Date().timeIntervalSince1970)
+let outputPath = "\(jamfSecurityFolder)"
+var pathToOutput = "\(outputPath)/JamfTrustDiagnostics.txt"
+
+// Function to run the tests (your existing code)
+func jamfTrustDiagnostics() {
+    func postDateTime() {
+        let utcDateTime = DateFormatter()
+        utcDateTime.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let dateStr = utcDateTime.string(from: Date())
+        try? "\(dateStr)\n".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func listSystemDetails() {
+        try? "\n---------------------------------- System Details ----------------------------------\n".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+        postMacOSVersion()
+        postNameServers()
+        postSystemExtensions()
+        postNetworkServices()
+        postIfConfig()
+        postNetStat()
+        try? "\n---------------------------------- System Details ----------------------------------\n".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func postMacOSVersion() {
+        let macOSVersion = runCommand("sw_vers")
+        try? "\nMacOS Version:\n\(macOSVersion)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func postNameServers() {
+        let nameServers = runCommand("scutil --dns | grep 'nameserver\\[[0-9]*\\]'")
+        try? "\nNameservers:\n\(nameServers)\n".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func postSystemExtensions() {
+        let extensions = runCommand("systemextensionsctl list")
+        try? "\nSystem Extensions:\n\(extensions)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func postNetworkServices() {
+        let services = runCommand("networksetup -listallnetworkservices")
+        try? "\nNetwork Services:\n\(services)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func postIfConfig() {
+        let ifConfig = runCommand("ifconfig -a -v")
+        try? "\nifconfig:\n\(ifConfig)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func postNetStat() {
+        let netStat = runCommand("netstat -rn")
+        try? "\nnetstat:\n\(netStat)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func runCommand(_ command: String) -> String {
+        let task = Process()
+        let pipe = Pipe()
+        
+        task.executableURL = URL(fileURLWithPath: "/bin/bash")
+        task.arguments = ["-c", command]
+        task.standardOutput = pipe
+        
+        do {
+            try task.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8) ?? ""
+        } catch {
+            return "Error running command: \(command)"
+        }
+    }
+    
+    func postResults(_ result: String) {
+        try? result.write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func pingTests(domain: String) {
+        let pingTest = runCommand("ping -c \(pingCount) \(domain) 2>&1")
+        let ping6Test = runCommand("ping6 -c \(pingCount) \(domain) 2>&1")
+        
+        try? "\nPing (IPV4):\n\(pingTest)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+        try? "\nPing (IPV6):\n\(ping6Test)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func curlTests(domain: String) {
+        let curlHttpTest = runCommand("curl -L -m \(curlTimeout) --silent --head http://\(domain) | awk '/^HTTP/'")
+        let curlHttpsTest = runCommand("curl -L -m \(curlTimeout) --silent --head https://\(domain) | awk '/^HTTP/'")
+        
+        try? "\n\nHTTP Request:\n\(curlHttpTest)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+        try? "\n\nHTTPS Request:\n\(curlHttpsTest)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func dnsTests(domain: String) {
+        let result = runCommand("host \(domain) | awk '{print $NF}'")
+        let dnsServer = runCommand("dig \(domain) | grep ';; SERVER:' | awk '{ $1=$2=\"\"; print $0 }' | sed 's/^[ \\t]*//'")
+        
+        try? "Domain: \(domain)\nResults: \(result)\nDNS Server being queried: \(dnsServer)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+    }
+    
+    func portTests(domain: String) {
+        try? "\n\nPort Tests:\n".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+        for port in ports {
+            let portTest = runCommand("nc -z -v -w \(Int(portTimeout)) \(domain) \(port) 2>&1")
+            try? "\(portTest)".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+        }
+    }
+    
+    func doTests() {
+        for domain in domains {
+            try? "\n---------------------------------- Tests for \(domain) ----------------------------------\n".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+            
+            if includeDNSTests { dnsTests(domain: domain) }
+            if includePingTests { pingTests(domain: domain) }
+            if includeCurlTests { curlTests(domain: domain) }
+            if includePortTests { portTests(domain: domain) }
+        }
+    }
+    
+    func run() {
+        try? FileManager.default.createDirectory(atPath: outputPath, withIntermediateDirectories: true, attributes: nil)
+        pathToOutput = "\(outputPath)/JamfTrustDiagnostics.txt"
+        
+        try? "\n=============================== Jamf Trust ===============================\n".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+        postDateTime()
+        doTests()
+        listSystemDetails()
+        try? "\n=============================== Jamf Trust ===============================\n".write(toFile: pathToOutput, atomically: true, encoding: .utf8)
+        
+    }
+    
+    run()
+}
+
+// Check for the presence of the file before running the tests
+func checkAndTrustDiagnostics() {
+    let filePath = "/Library/Managed Preferences/com.jamf.trust.plist"
+    let fileManager = FileManager.default
+    
+    if fileManager.fileExists(atPath: filePath) {
+        // File exists, run the tests
+        print("✅ File found. Running the tests...")
+        jamfTrustDiagnostics()
+    } else {
+        // File doesn't exist, print a message
+        print("❌ File not found at \(filePath). Skipping tests.")
+    }
+}
+
+// Call the function to check and run tests
+checkAndTrustDiagnostics()
+
+// MDMCheck.txt Creation and output
+
+// Function to run a shell command and return its output
+func runShellCommand(_ command: String, arguments: [String] = []) -> String {
+    let process = Process()
+    process.launchPath = command
+    process.arguments = arguments
+    
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    process.standardError = pipe
+    
+    do {
+        try process.run()
+    } catch {
+        return "Error running command: \(command)"
+    }
+    
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+}
+
+// Paths
+
+let mdmCheckFilePath = "\(mainFolderPath)/MDMCheck.txt"
+
+// Start writing the results
+var mdmCheckResults = "MDM Check Report\n=================\n"
+
+// Get the logged-in user
+
+mdmCheckResults += "Checking \(loggedInUser)'s computer for MDM communication issues:\n"
+
+// 1. Check MDM status
+let mdmLog = runShellCommand("/usr/bin/log", arguments: ["show", "--style", "compact", "--predicate", "(process CONTAINS \"mdmclient\")", "--last", "1d"])
+
+if mdmLog.contains("Unable to create MDM identity") {
+    mdmCheckResults += "- MDM is broken\n"
+} else {
+    mdmCheckResults += "- MDM is communicating\n"
+}
+
+// 2. Check if the MDM Profile is installed
+let mdmProfileCheck = runShellCommand("/usr/libexec/mdmclient", arguments: ["QueryInstalledProfiles"])
+if mdmProfileCheck.contains("00000000-0000-0000-A000-4A414D460003") {
+    mdmCheckResults += "- MDM Profile Installed\n"
+} else {
+    mdmCheckResults += "- MDM Profile Not Installed\n"
+}
+
+// 3. Get the MDM Daemon Status
+let apsctlStatus = runShellCommand("/System/Library/PrivateFrameworks/ApplePushService.framework/apsctl", arguments: ["status"])
+let daemonLines = apsctlStatus.components(separatedBy: "\n")
+if let daemonLine = daemonLines.first(where: { $0.contains("persistent connection status") }) {
+    let statusValue = daemonLine.components(separatedBy: ":").last?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Unknown"
+    mdmCheckResults += "- The MDM Daemon Status is: \(statusValue)\n"
+} else {
+    mdmCheckResults += "- MDM Daemon Status: Not Found\n"
+}
+
+// 4. Get the APNS Topic
+let configProfiles = runShellCommand("/usr/sbin/system_profiler", arguments: ["SPConfigurationProfileDataType"])
+let topicLine = configProfiles.components(separatedBy: "\n").first(where: { $0.contains("Topic") })
+
+if let topic = topicLine?.components(separatedBy: "\"").dropFirst(1).first {
+    mdmCheckResults += "- APNS Topic is: \(topic)\n"
+} else {
+    mdmCheckResults += "- No APNS Topic Found\n"
+}
+
+// Write to the MDMCheck.txt file
+do {
+    try mdmCheckResults.write(toFile: mdmCheckFilePath, atomically: true, encoding: .utf8)
+    print("✅ MDMCheck.txt created at \(mdmCheckFilePath)")
+} catch {
+    print("❌ Failed to write MDMCheck.txt: \(error.localizedDescription)")
+}
+
+print("✅ Log gathering complete! Files are saved to: \(mainFolderPath)")
+
+        
