@@ -1,10 +1,8 @@
 #!/bin/bash
 
-#Jamf Log Grabber is designed to collect any logs associated with Jamf Products as well as MDM Managed Preferences.
-#Jamf Products currently supported: Jamf Binary (including Recon Troubleshooting), Jamf Connect, Jamf Security (Protect and Trust), App Installers, and Jamf Remote Assist
-#Log Grabber 2.0 revamp started 11/18/23 to design a more easy to customize workflow for grabbing logs
+#Jamf Log Grabber is designed to collect any logs associated with Jamf managed devices.
 
-#Arrays are now set for each individual type of log. Simply add or remove array names to call them in the script (Line 278)
+#Custom arrays are now set for each individual type of log. It is recommended to include all as there are minor dependencies for some arrays.
 #This new workflow allows for you to add arrays for additional in house apps like SUPER, DEPNOTIFY, Crowdstrike, or any other commonly used MacOS applications.
 
 ####################################################################################################
@@ -77,17 +75,17 @@ currenttime1=$(echo "$(currenttime)" | awk '{print $2}')
 #You can add custom app log grabbing using the following rubric, just continue numbering the appnames or renaming them to fit your needs
 #You can pass jamf script variables as part of a policy to get your additional apps
 
-CustomApp1Name="$4"
+#CustomApp1Name=$4
 CustomApp1Folder=$log_folder/$CustomApp1Name
-CustomApp1LogSource="$5"
+#CustomApp1LogSource="$5"
 #Now go down to CustomApp1Array and put in the files you want to grab
-CustomApp2Name="$6"
+#CustomApp2Name="$6"
 CustomApp2Folder=$log_folder/$CustomApp2Name
-CustomApp2LogSource="$7"
+#CustomApp2LogSource="$7"
 #Now go down to CustomApp2Array and put in the files you want to grab
-CustomApp3Name="$8"
+#CustomApp3Name="$8"
 CustomApp3Folder=$log_folder/$CustomApp3Name
-CustomApp3LogSource="$9"
+#CustomApp3LogSource="$9"
 #Now go down to CustomApp2Array and put in the files you want to grab
 ####################################################################################################
 
@@ -159,57 +157,44 @@ Jamf() {
 		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Software plist not found" >> $results
 	fi
 	mkdir -p $log_folder/Self_Service
-	#check for jamf self service logs
-	#build out case argument to get SS, SS+, or both when installed
-#	if [ -e /$HOME/Library/Logs/JAMF ]; then cp -r "$HOME/Library/Logs/JAMF/" $self_service
-#	else
-#		printf '<code style="color: %s;">%s<br></code>' "red" "Jamf Self Service Logs not found" >> $results
-#	fi
 	#Checks what versions of self service are installed 
 	if [ -e /Applications/Self\ Service.app ]; then 
 		og="true"
 	else
 		og="false"
 	fi
-	echo "$og"
 	if [[ -e /Applications/Self\ Service+.app ]]; then
 		ssPlus="true"
 	else
 		ssPlus="false"
 	fi
-	echo "$ssPlus"
 	#fun little logic to update selfServiceStatus variable to pull logs according to reporting
 	if [ $og == "true" ] && [ $ssPlus == "true" ]; then
 		selfServiceStatus="ogPlus"
-		echo "true/true"
-		echo $selfServiceStatus
 	elif [ $og == "true" ] && [ $ssPlus == "false" ]; then
 		selfServiceStatus="ogSS"
-		echo "true/false"
 	elif [ $og == "false" ] && [ $ssPlus == "true" ]; then
 		selfServiceStatus="ssPlus"
-		echo "false/true"
 	else
 		selfServiceStatus="notInstalled"
-		echo "not installed"
 	fi
 	#everything put together to pull SS, SS+, or both apps logs
 	case $selfServiceStatus in
 		ogPlus)
-			echo "Self Service and Self Service+ are installed on this machine"
+			printf '<code style="color: %s;">%s<br></code>' "white" "Self Service and Self Service+ are installed on this machine" >> $results
 			cp -r "$HOME/Library/Logs/JAMF/" $self_service
 			log show --style compact --predicate 'subsystem == "com.jamf.selfserviceplus"' --debug --info > $self_service/SelfServicePlus.log
 		;;
 		ssplus)
-			echo "Self Service+ is installed on this machine"
+			printf '<code style="color: %s;">%s<br></code>' "white" "Self Service+ is installed on this machine" >> $results
 			log show --style compact --predicate 'subsystem == "com.jamf.selfserviceplus"' --debug --info > $self_service/SelfServicePlus.log
 		;;
 		ogSS)
-			echo "Self Service is installed on this machine"
+			printf '<code style="color: %s;">%s<br></code>' "white" "Self Service is installed on this machine" >> $results
 			cp -r "$HOME/Library/Logs/JAMF/" $self_service
 		;;
 		*)
-			echo "Self Service and Self Service+ are not installed on this machine"
+			printf '<code style="color: %s;">%s<br></code>' "white" "Self Service and Self Service+ are not installed on this machine" >> $results
 			esac
 	#Checks current MacOS Version against GDMF feed and flags if not a current release
 	currentMacOS=$(sw_vers --buildVersion)
@@ -247,7 +232,7 @@ Jamf() {
 				printf '<code style="color: %s;">%s<br></code>' "red" "Unable to find SoftwareUpdate info.plist" >> $results
 			fi
 				if [[ -e /private/var/db/softwareupdate/SoftwareUpdateDDMStatePersistence.plist ]]; then 
-				/private/var/db/softwareupdate/SoftwareUpdateDDMStatePersistence.plist > $JSS/SoftwareUpdates/DDM.plist
+				cp /private/var/db/softwareupdate/SoftwareUpdateDDMStatePersistence.plist $JSS/SoftwareUpdates/DDM.plist
 			else 
 				printf '<code style="color: %s;">%s<br></code>' "red" "Unable to find Software Update DDM plist" >> $results
 			fi
@@ -272,6 +257,7 @@ Jamf() {
 	sudo profiles show -output $JSS/profiles.xml stdout-xml	
 	/usr/libexec/mdmclient AvailableOSUpdates > $JSS/SoftwareUpdates/AvailableOSUpdates.txt
 	/usr/libexec/mdmclient QueryDeviceInformation > $JSS/QueryDeviceInformation.txt
+	/usr/libexec/mdmclient QueryInstalledApps > $JSS/QueryDeviceInformation.txt
 	/usr/libexec/mdmclient DumpManagementStatus > $JSS/DumpManagementStatus.txt
 	launchctl dumpstate > $JSS/launchctl_dumpstate.txt
 	systemextensionsctl list > $JSS/system_extensions.txt
@@ -424,10 +410,6 @@ Protect() {
 	#MAKE DIRECTORY FOR ALL JAMF SECURITY RELATED FILES
 	mkdir -p $log_folder/Jamf_Security
 	printf '<h2>Jamf Protect</h2>' >> $results
-	#CHECK FOR JAMF PROTECT DIAGNOSTICS FOLDER, THEN COPY IF PRESENT
-#	if [[ $protectDiagnostics != "" ]]; then cp -r "$HOME/Desktop/$protectDiagnostics" "$security"
-#		printf '<code style="color: %s;">%s<br></code>' "red" "A 'protectctl diagnostics' command has been previously ran and the diagnostics folder was found on the desktop of this device." >> $results
-#	fi
 	shopt -s nocasematch
 	
 	case $runProtectDiagnostics in
@@ -583,7 +565,6 @@ Remote_Assist() {
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist not installed, skipping version and network check." >> $results
 	else
 		#ADD JAMF Remote Assist Log Folder
-		mkdir -p $JRA/Remote_Assist_Logs
 		printf '<code style="color: %s;">%s<br></code>' "white" "Jamf Remote Assist Version: $JRA3Check" >> $results
 		function createNetworkCheckTableJRA () {
 
@@ -724,7 +705,7 @@ EOF
 		CalculateHostInfoTablesJRA
 		createNetworkCheckTableJRA 
 		
-		log show --style compact --predicate 'subsystem BEGINSWITH "com.jamf.remoteassist"' --debug > $JRA/JRA_debug		
+		log show --style compact --predicate 'subsystem BEGINSWITH "com.jamf.remoteassist"' --debug > $JRA/JRA_debug.log
 	fi
 }
 
@@ -1049,12 +1030,3 @@ logGrabberMasterArray
 Cleanup
 #Zips Results- Comment out or remove the line below to leave the folder unzipped
 Zip_Folder 
-
-
-#Adding a new function/array
-#1. Create a variable in the standard variable declarations
-#2. Build your function at the end of the list. Insert just above `CustomApp1Array`. Make sure to include outputs to the $results file for what the function is doing
-#3. In the cleanup function, add your folder name to the list of folders in the $cleanup variable
-#4. In $logsToGrab, add the name of your app array so that the logGrabberMasterArray knows to run it
-#5. In `logGrabberMasterArray` edit the `case` function to add a case that matches what you put in $logsToGrab and then put the name of the function to run below, it should be self explanatory as you look at the case function
-#6. Run multiple tests to confirm that the whole script runs with everything in it and confirm the results are as expected
