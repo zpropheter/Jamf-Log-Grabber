@@ -257,7 +257,7 @@ Jamf() {
 	sudo profiles show -output $JSS/profiles.xml stdout-xml	
 	/usr/libexec/mdmclient AvailableOSUpdates > $JSS/SoftwareUpdates/AvailableOSUpdates.txt
 	/usr/libexec/mdmclient QueryDeviceInformation > $JSS/QueryDeviceInformation.txt
-	/usr/libexec/mdmclient QueryInstalledApps > $JSS/QueryDeviceInformation.txt
+	/usr/libexec/mdmclient QueryInstalledApps > $JSS/QueryDeviceApplications.txt
 	/usr/libexec/mdmclient DumpManagementStatus > $JSS/DumpManagementStatus.txt
 	launchctl dumpstate > $JSS/launchctl_dumpstate.txt
 	systemextensionsctl list > $JSS/system_extensions.txt
