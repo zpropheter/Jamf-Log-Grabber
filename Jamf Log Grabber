@@ -543,7 +543,7 @@ Managed_Preferences_Array() {
 #Array for Device Compliance
 DeviceCompliance() {
 	mkdir -p $log_folder/Device_Compliance
-	log show --predicate 'subsystem CONTAINS "jamfAAD" OR subsystem BEGINSWITH "com.apple.AppSSO"' > $Device_Compliance/JamfConditionalAccess.log
+	log show --debug --info --predicate 'subsystem CONTAINS "jamfAAD" OR subsystem BEGINSWITH "com.apple.AppSSO" OR subsystem BEGINSWITH "com.jamf.backgroundworkflows"' > $Device_Compliance/JamfConditionalAccess.log
 	if [ -e /Library/Logs/Microsoft/Intune/ ]; then cp /Library/Logs/Microsoft/Intune/*.log $Device_Compliance
 	else
 		printf '<h2>Device Compliance</h2>' >> $results
