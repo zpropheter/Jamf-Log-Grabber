@@ -4,6 +4,7 @@
 //  Created by Zach Propheter on
 //  Updated by Paull Stanley on 3/22/25.
 //  Jamf Trust Diag added on 4/9/25
+//  Device Compliance update added 5/5/25
 
 import Foundation
 
@@ -361,7 +362,63 @@ if !runCommand("which protectctl").isEmpty {
     print("⚠️ protectctl not found on this system.")
 }
 
-runAndSave(command: "log show --predicate 'subsystem CONTAINS \"jamfAAD\" OR subsystem BEGINSWITH \"com.apple.AppSSO\"'", outputPath: "\(mainFolderPath)/Device_Compliance/JamfConditionalAccess.log")
+func runAndStreamToFile(command: String, arguments: [String], outputPath: String) {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: command)
+    process.arguments = arguments
+    
+    let outputPipe = Pipe()
+    process.standardOutput = outputPipe
+    process.standardError = outputPipe
+    
+    let fileHandle: FileHandle
+    do {
+        FileManager.default.createFile(atPath: outputPath, contents: nil, attributes: nil)
+        fileHandle = try FileHandle(forWritingTo: URL(fileURLWithPath: outputPath))
+    } catch {
+        print("Failed to open file for writing: \(error)")
+        return
+    }
+    
+    let readingHandle = outputPipe.fileHandleForReading
+    readingHandle.readabilityHandler = { handle in
+        let data = handle.availableData
+        if data.isEmpty {
+            return
+        }
+        
+        // Just write to file — no terminal output
+        do {
+            try fileHandle.write(contentsOf: data)
+        } catch {
+            print("Error writing to file: \(error)")
+        }
+    }
+    
+    do {
+        try process.run()
+        process.waitUntilExit()
+        readingHandle.readabilityHandler = nil
+        try fileHandle.close()
+        print("Finished writing to \(outputPath)")
+    } catch {
+        print("Error running process: \(error)")
+    }
+}
+
+
+runAndStreamToFile(
+    command: "/usr/bin/log",
+    arguments: [
+        "show",
+        "--debug",
+        "--info",
+        "--predicate",
+        #"subsystem CONTAINS "jamfAAD" OR subsystem BEGINSWITH "com.apple.AppSSO" OR subsystem BEGINSWITH "com.jamf.backgroundworkflows""#,
+        "--last", "1d",
+    ],
+    outputPath: "\(mainFolderPath)/Device_Compliance/JamfConditionalAccess.log"
+)
 
 // MARK: - Jamf Connect Logs
 
@@ -688,5 +745,3 @@ do {
 }
 
 print("✅ Log gathering complete! Files are saved to: \(mainFolderPath)")
-
-        
