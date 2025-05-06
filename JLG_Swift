@@ -745,3 +745,46 @@ do {
 }
 
 print("✅ Log gathering complete! Files are saved to: \(mainFolderPath)")
+
+
+
+// Reset all folder permissions so users can delete
+
+func runCommand(_ command: String, arguments: [String] = []) -> (output: String?, error: String?, exitCode: Int32) {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = [command] + arguments
+    
+    let outputPipe = Pipe()
+    process.standardOutput = outputPipe
+    
+    let errorPipe = Pipe()
+    process.standardError = errorPipe
+    
+    do {
+        try process.run()
+        process.waitUntilExit()
+    } catch {
+        return (nil, error.localizedDescription, -1)
+    }
+    
+    let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+    let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+    
+    let output = String(data: outputData, encoding: .utf8)
+    let error = String(data: errorData, encoding: .utf8)
+    
+    return (output?.trimmingCharacters(in: .whitespacesAndNewlines), error?.trimmingCharacters(in: .whitespacesAndNewlines), process.terminationStatus)
+}
+
+func makeFilesDeletableByAnyone(at path: String) {
+    // Set full read/write/execute permissions for all users (directories and files)
+    let result = runCommand("chmod", arguments: ["-R", "777", path])
+    if result.exitCode == 0 {
+        print("✅ Made files at \(path) accessible and deletable by any user.")
+    } else {
+        print("⚠️ Failed to update permissions at \(path): \(result.error ?? "Unknown error")")
+    }
+}
+
+makeFilesDeletableByAnyone(at: mainFolderPath)
