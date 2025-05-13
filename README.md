@@ -29,28 +29,7 @@ Jamf Log Grabber is a bash based script that can be deployed manually, via Jamf 
 
 ## Installation
 
-> [!TIP]
-> You can use the method below to get the most up to date version of Jamf Log Grabber. If you want, you can also copy and paste the entire script to a scripts payload as outlined below, but it will be a static version instead.
-
-Create a Jamf Pro policy that runs the following bash script:
-- `curl -sSL https://jamf.it/get-logs | bash`
-
-To call it manually in a terminal window, use the following command:
-- `curl -sSL https://jamf.it/get-logs | sudo bash`
-
-If you want to run Jamf Log Grabber with custom application create a Jamf Pro policy that runs the following bash script:
-```
-#!/bin/bash
-
-export CustomApp1Name="$4"
-export CustomApp1LogSource="$5"
-export CustomApp2Name="$6"
-export CustomApp2LogSource="$7"
-export CustomApp3Name="$8"
-export CustomApp3LogSource="$9"
-
-curl -sSL jamf.it/get-logs-custom | bash
-```
+Copy and paste the latest version of Jamf Log Grabber to a scripts payload as outlined below.
 
 -In Jamf Pro, paste the contents of the script in a new script payload under Settings> Computer Management> Scripts> +New
 
