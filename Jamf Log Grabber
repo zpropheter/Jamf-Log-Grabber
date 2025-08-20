@@ -727,12 +727,12 @@ EOF
 		<h3>Failed App Installer Check</h3>
 		<p>The following files were found in the app installer logs and show failed or stuck installations. If you are troubleshooting failed App Installers, please examine the following files.</p>
 EOF
-				stuckAppInstallers=$(ls /Library/Application Support/JamfAppInstallers/)
+				stuckAppInstallers=$(ls "/Library/Application Support/JamfAppInstallers/")
 				if [[ $stuckAppInstallers == "" ]]; then
 					:
 				else
-					printf '<code style="color: %s;">%s<br></code>' "yellow" "Here's a list of stuck app installers" >> $results
-					echo $stuckAppInstallers >> $results
+					printf '<code style="color: %s;">%s<br></code>' "red" "Here's a list of stuck app installers" >> $results
+					printf '<code style="color: %s;">%s<br></code>' "yellow" "-$stuckAppInstallers" >> $results
 				fi
 				printf '<code style="color: %s;">%s<br></code>' "red" "Here's a list of failed app installer logs" >> $results
 				touch $App_Installers/commandUUID.txt
