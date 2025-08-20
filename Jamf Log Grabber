@@ -126,6 +126,8 @@ buildHTMLResults() {
 #Array for Jamf Logs
 Jamf() {
 	printf '<h2>Client Logs</h2>' >> $results
+	printUptime=$(uptime | /usr/bin/awk '{print $3, $4, $5 }')
+	printf '<code style="color: %s;">%s<br></code>' "green" "Device uptime is: $printUptime hours"	>> $results
 	mkdir -p $log_folder/Client_Logs
 	#GET SYSTEM PROFILE REPORT- This spits out a couple errors due to KEXT stuff that's deprecated
 	system_profiler -xml > $JSS/SystemReport.spx 2>/dev/null
@@ -236,17 +238,6 @@ Jamf() {
 			else 
 				printf '<code style="color: %s;">%s<br></code>' "red" "Unable to find Software Update DDM plist" >> $results
 			fi
-	#############################################
-	#        	    DDM Info   			        #
-	#############################################
-	#Copy the current declaration info.plists for reference
-	DDMInfoPlists=$(ls /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/ | grep -Ewv 'SoftwareUpdateSubscriber.xpc')
-		mkdir -p $JSS/DDM
-			for file in $DDMInfoPlists; do
-				if [[ -e /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/$file/Contents/info.plist ]]; then
-					cp /System/Library/PrivateFrameworks/RemoteManagement.framework/XPCServices/$file/Contents/info.plist $JSS/DDM/"$file"_info.plist
-				fi
-			done
 	#Parse through all agents and deamons for any running keyword "jamf" and are not a part of standard Jamf applications. If none are found, they are still printed 
 	AgentsAndDaemons=$(grep -r "jamf" /Users/$loggedInUser/Library/LaunchAgents/ /Library/LaunchAgents/ /Library/LaunchDaemons/ /System/Library/LaunchAgents/ /System/Library/LaunchDaemons/)
 			printf '<code style="color: %s;">%s<br></code>' "white" "A search for custom Agents and Daemons containing 'jamf' keywords has been ran and a copy of the results can be found in the Client Logs folder." >> $results
@@ -345,7 +336,8 @@ Connect() {
 	connectDateCompare=$(date +%Y%m%d)
 	
 	#REPORT JAMF CONNECT PRIVILEGE ELEVATION LOGS
-	log show --style compact --predicate '(subsystem == "com.jamf.connect.daemon") && (category == "PrivilegeElevation")' >> $connect/Connect_Daemon_Elevation_Logs.txt
+	log show --style compact --predicate '(subsystem == "com.jamf.connect.daemon") && (category == "PrivilegeElevation")' >> $connect/Connect_Daemon_Elevation_Logs_Legacy.txt
+	log show --style compact --predicate '(subsystem == "com.jamf.connect.daemon.ssp") && (category == "PrivilegeElevation")' >> $connect/Connect_Daemon_Elevation_Logs_SSP.txt
 	log show --style compact --predicate '(subsystem == "com.jamf.connect") && (category == "PrivilegeElevation")' >> $connect/Connect_Menubar_Elevation_Logs.txt
 	
 	connectLicenseArray() {
@@ -733,8 +725,15 @@ EOF
 			if [[ $checkForAllFailedInstalls = "True" ]]; then
 				/bin/cat << EOF >> "$results"
 		<h3>Failed App Installer Check</h3>
-		<p>The following files were found in the app installer logs and show failed installations. If you are troubleshooting failed App Installers, please examine the following files.</p>
+		<p>The following files were found in the app installer logs and show failed or stuck installations. If you are troubleshooting failed App Installers, please examine the following files.</p>
 EOF
+				stuckAppInstallers=$(ls /Library/Application Support/JamfAppInstallers/)
+				if [[ $stuckAppInstallers == "" ]]; then
+					:
+				else
+					printf '<code style="color: %s;">%s<br></code>' "yellow" "Here's a list of stuck app installers" >> $results
+					echo $stuckAppInstallers >> $results
+				fi
 				printf '<code style="color: %s;">%s<br></code>' "red" "Here's a list of failed app installer logs" >> $results
 				touch $App_Installers/commandUUID.txt
 				for file in $App_Installers/_Completed/*; do
