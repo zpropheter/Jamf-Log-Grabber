@@ -218,7 +218,7 @@ Jamf() {
 	fi
 	#############################################
 	#            Software Update Stuff          #
-	#############################################
+	#############################################=
 	#Show Secure Token enabled users
 	checkForSecureTokenUsers=$(fdesetup list | sed -E 's/,[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}//g')
 			if [[ $checkForSecureTokenUsers == "" ]]; then
@@ -246,6 +246,93 @@ Jamf() {
 	sudo cat /Library/Application\ Support/JAMF/.jmf_settings.json > $JSS/restricted_software.json
 	#show installed profiles and output to xml. Use this to compare profile settings against actual settings in Managed Preferences Folder
 	sudo profiles show -output $JSS/profiles.xml stdout-xml	
+			#Swift function to check for multiple profiles with deferrals
+			#must run after profiles command:
+			# Usage: ./run_duplicate_check.sh ~/Desktop/profiles.xml
+			PLIST_FILE="$JSS/profiles.xml"
+			
+			if [[ ! -f "$PLIST_FILE" ]]; then
+				printf "❌ File not found: %s\n" "$PLIST_FILE"
+				exit 1
+			fi
+			
+			# Run Swift inline and capture output
+			SWIFT_OUTPUT=$(swift - <<'EOF' "$PLIST_FILE"
+import Foundation
+
+// Recursive search for the target key
+func searchForDelay(in object: Any, displayName: String, level: String) {
+	if let dict = object as? [String: Any] {
+		// If we find the key here
+		if let delay = dict["enforcedSoftwareUpdateMajorOSDeferredInstallDelay"] {
+			print("Profile Name: \(displayName)")
+			print("  enforcedSoftwareUpdateMajorOSDeferredInstallDelay: \(delay)")
+			print()
+		}
+		// Recurse deeper
+		for (_, value) in dict {
+			searchForDelay(in: value, displayName: displayName, level: level)
+		}
+	} else if let array = object as? [Any] {
+		for item in array {
+			searchForDelay(in: item, displayName: displayName, level: level)
+		}
+	}
+}
+
+func checkProfiles(filePath: String) {
+	guard let data = FileManager.default.contents(atPath: filePath) else {
+		print("❌ Could not read file at \(filePath)")
+		return
+	}
+	
+	do {
+		let plist = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
+		
+		guard let dict = plist as? [String: Any] else {
+			print("❌ Unexpected plist format")
+			return
+		}
+		
+		let levels = ["_computerlevel", "_userlevel", "_systemlevel"]
+		var found = false
+		
+		for level in levels {
+			guard let profiles = dict[level] as? [[String: Any]] else { continue }
+			
+			for profile in profiles {
+				let displayName = profile["ProfileDisplayName"] as? String ?? "(Unknown Name)"
+				searchForDelay(in: profile, displayName: displayName, level: level)
+				found = true
+			}
+		}
+		
+		if !found {
+			print("No profiles with enforcedSoftwareUpdateMajorOSDeferredInstallDelay found.")
+		}
+		
+	} catch {
+		print("❌ Error parsing plist: \(error)")
+	}
+}
+
+// --- Main ---
+if CommandLine.arguments.count < 2 {
+	print("Usage: checkProfiles <profiles.xml>")
+	exit(1)
+}
+
+let filePath = CommandLine.arguments[1]
+checkProfiles(filePath: filePath)
+EOF
+)
+
+	if [[ $SWIFT_OUTPUT != "" ]]; then
+		printf '<code style="color: %s;">%s<br></code>' "red" "$SWIFT_OUTPUT" >> $results 
+	fi
+
+
+
 	/usr/libexec/mdmclient AvailableOSUpdates > $JSS/SoftwareUpdates/AvailableOSUpdates.txt
 	/usr/libexec/mdmclient QueryDeviceInformation > $JSS/QueryDeviceInformation.txt
 	/usr/libexec/mdmclient QueryInstalledApps > $JSS/QueryDeviceApplications.txt
