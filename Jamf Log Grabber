@@ -131,23 +131,23 @@ Jamf() {
 	mkdir -p $log_folder/Client_Logs
 	#GET SYSTEM PROFILE REPORT- This spits out a couple errors due to KEXT stuff that's deprecated
 	system_profiler -xml > $JSS/SystemReport.spx 2>/dev/null
-	#ADD JAMF CLIENT LOGS TO LOG FOLDER
+	#ADD JAMF CLIENT LOG TO LOG FOLDER
 	if [ -e /private/var/log/jamf.log ]; then cp "/private/var/log/jamf.log" $JSS
 		grep  "Error" $JSS/jamf.log > $JSS/jamferror.log
 	else
 		printf '<p><code style="color: %s;">%s<br></p></code>' "red" "Jamf Client Logs not found" >> $results
 	fi
-	#CHECK FOR JAMF INSTALL LOGS
+	#CHECK FOR JAMF INSTALL LOG
 	if [ -e /var/log/install.log ]; then cp "/var/log/install.log" $JSS 
 	else
 		printf '<code style="color: %s;">%s<br></code>' "red" "Install Logs not found" >> $results
 	fi
-	#CHECK FOR JAMF SYSTEM LOGS
+	#CHECK FOR JAMF SYSTEM LOG
 	if [ -e /var/log/system.log ]; then cp "/var/log/system.log" $JSS
 	else
 		printf '<code style="color: %s;">%s<br></code>' "red" "System Logs not found" >> $results
 	fi
-	#CHECK FOR JAMF SYSTEM LOGS
+	#CHECK FOR JAMF MCXTools LOG
 	if [ -e /Library/Logs/MCXTools.log ]; then cp "/Library/Logs/MCXTools.log" $JSS
 	else
 		printf '<code style="color: %s;">%s<br></code>' "red" "System Logs not found" >> $results
@@ -180,7 +180,7 @@ Jamf() {
 	else
 		selfServiceStatus="notInstalled"
 	fi
-	#everything put together to pull SS, SS+, or both apps logs
+	#everything put together to pull SS, SSP, or both apps logs
 	case $selfServiceStatus in
 		ogPlus)
 			printf '<code style="color: %s;">%s<br></code>' "white" "Self Service and Self Service+ are installed on this machine" >> $results
@@ -330,9 +330,7 @@ EOF
 	if [[ $SWIFT_OUTPUT != "" ]]; then
 		printf '<code style="color: %s;">%s<br></code>' "red" "$SWIFT_OUTPUT" >> $results 
 	fi
-
-
-
+#Run through mdmclient commands to get status for various items.
 	/usr/libexec/mdmclient AvailableOSUpdates > $JSS/SoftwareUpdates/AvailableOSUpdates.txt
 	/usr/libexec/mdmclient QueryDeviceInformation > $JSS/QueryDeviceInformation.txt
 	/usr/libexec/mdmclient QueryInstalledApps > $JSS/QueryDeviceApplications.txt
@@ -348,7 +346,6 @@ EOF
 		printf '<code style="color: %s;">%s<br></code>' "red" "No crash reports found." >> $results
 	fi
 }
-
 
 ####################################################################################################
 #Array for Jamf Connect Logs
@@ -536,6 +533,8 @@ Protect() {
 
 ####################################################################################################
 #Array for Recon Troubleshoot
+#Recon troubleshoot checks for files left in the tmp folder while also comparing timestamps to the last policy execution in jamf.log 
+#If the jamf.log matches current time, it throws a flag in results.html that there may be false positives.
 Recon_Troubleshoot() {
 	mkdir -p $log_folder/Recon
 	#check for Jamf Recon leftovers
@@ -566,6 +565,7 @@ Recon_Troubleshoot() {
 ####################################################################################################
 #Array for MDM Communication Check
 #IF A DEVICE IS NOT COMMUNICATING WITH MDM, THIS WILL GIVE ITEMS TO LOOK INTO
+#These are all common EAs that are deployed for MDM communication concerns
 MDMCommunicationCheck() {
 	touch $log_folder/MDMCheck.txt
 	#WRITE TO LOGS WHAT WE ARE DOING NEXT
@@ -632,11 +632,10 @@ DeviceCompliance() {
 	else
 		printf '<code style="color: %s;">%s<br></code>' "orange" "Device Compliance user logs not found" >> $results
 	fi
-	
 }
 
 ####################################################################################################
-#Array for Device Compliance
+#Array for Remote Assist
 Remote_Assist() {
 	JRA3Check=$(defaults read /Library/Application\ Support/JAMF/Remote\ Assist/jamfRemoteAssistConnectorUI.app/Contents/Info.plist CFBundleVersion 2>/dev/null)
 	printf '<h2>Jamf Remote Assist</h2>' >> $results
@@ -650,6 +649,7 @@ Remote_Assist() {
 			/bin/cat << EOF >> "$results"  
 		<p />
 		<p>Network access to the following hostnames are required for using Jamf Remote Assist. These hostnames are a small sample as the Relay hostnames can increment up to 100 currently.</p>
+#Code taken from Jamf Environment Test to run a handful of quick network tests related to Jamf Remote Assist domains.
 ${HOST_TEST_TABLES}
 EOF
 		}
@@ -790,7 +790,7 @@ EOF
 
 ####################################################################################################
 #Array for App Installers Directory
-#When done, remove the associated array comment/# inside the Case command inside the logGrabberMasterArray
+#This code is also taken from Jamf Environment test.
 AppInstallers() {
 	mkdir -p $App_Installers
 	if [ -e /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/ ]; then cp -r /var/db/ConfigurationProfiles/Settings/Managed\ Applications/Device/ directory $App_Installers
@@ -1011,8 +1011,7 @@ CustomApp3Array() {
 }
 
 ####################################################################################################
-
-#Array for folder cleanup
+#Array for folder cleanup- loops through and removes empty folders created at the ebginning of the run if not needed.
 Cleanup() {
 	#IF AN ARRAY IS NOT SET TO RUN, REMOVE THE FOLDER NAME FOR IT BELOW TO AVOID ERRORS WITH THE CLEANUP FUNCTION AT THE END OF THE SCRIPT
 	cleanup=("Client_Logs Recon Self_Service Connect Jamf_Security Managed_Preferences Device_Compliance JRA App_Installers $CustomApp1Name $CustomApp2Name $CustomApp3Name")
